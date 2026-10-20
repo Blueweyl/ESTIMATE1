@@ -59,6 +59,24 @@
       </div>
     </sc-if>
 
+    <sc-if value="{{ projectLoading }}" hint-placeholder-val="{{ false }}">
+      <div style="background:oklch(0.97 0.02 255);border-bottom:1px solid oklch(0.88 0.03 255);padding:10px 28px;font-size:13px;color:oklch(0.4 0.08 255);display:flex;align-items:center;gap:8px;">
+        <div style="width:7px;height:7px;border-radius:50%;background:oklch(0.55 0.12 255);animation:pulse 1s infinite;"></div>
+        Loading project from Google Sheets… edits are paused until it arrives.
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ hasLoadError }}" hint-placeholder-val="{{ false }}">
+      <div style="background:oklch(0.97 0.03 70);border-bottom:1px solid oklch(0.85 0.08 70);padding:10px 28px;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:oklch(0.42 0.1 70);">
+        <div>⚠ Could not load this project from Google Sheets ({{ loadError }}). Showing the last local copy, if any.</div>
+        <div onClick="{{ dismissLoadError }}" style="font-weight:700;cursor:pointer;padding:4px 8px;">Dismiss</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ noProject }}" hint-placeholder-val="{{ false }}">
+      <div style="background:oklch(0.97 0.01 255);border-bottom:1px solid oklch(0.9 0.01 255);padding:10px 28px;font-size:13px;color:oklch(0.45 0.02 255);">No project is open. Create one under Projects → "+ New Project" — nothing is saved until you do.</div>
+    </sc-if>
+
     <div style="flex:1;overflow:auto;padding:28px;">
 
       <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ true }}">
@@ -223,7 +241,7 @@
 
               <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
                 <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Formula</div>
-                <div style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:oklch(0.55 0.02 255);background:oklch(0.98 0.004 255);padding:8px 10px;border-radius:6px;">Unit Weight (kg/m) = d² ÷ 162 &nbsp;·&nbsp; Total kg = Length × Unit Weight × (1 + Wastage)</div>
+                <div style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:oklch(0.55 0.02 255);background:oklch(0.98 0.004 255);padding:8px 10px;border-radius:6px;">Unit Weight (kg/m) = d² ÷ 162 &nbsp;·&nbsp; Material kg = Length × Unit Weight × (1 + Wastage) &nbsp;·&nbsp; Labor on net kg (or lm)</div>
               </div>
 
               <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
@@ -626,11 +644,15 @@
                 <div style="font-size:14px;font-weight:700;">Google Sheets Backup</div>
                 <span style="{{ sheetsStatusBadge }}">{{ sheetsStatusLabel }}</span>
               </div>
-              <div style="font-size:12.5px;color:oklch(0.5 0.02 255);margin-bottom:14px;">Project data, BOQ, prices and cost summaries sync to a Google Sheet via an Apps Script Web App. See backend/DEPLOYMENT.md for setup.</div>
+              <div style="font-size:12.5px;color:oklch(0.5 0.02 255);margin-bottom:14px;">Project data, BOQ, prices and cost summaries sync to a Google Sheet via an Apps Script Web App. See backend/DEPLOYMENT.md for setup. The token is a shared secret: anyone who can use this browser profile can use it, so treat this as an internal tool.</div>
               <label style="{{ labelStyle }}">Apps Script Web App URL</label>
               <input placeholder="https://script.google.com/macros/s/…/exec" value="{{ backend.scriptUrl }}" onChange="{{ h4.scriptUrl }}" style="{{ inputStyle }}"/>
               <label style="{{ labelStyle }}margin-top:10px;display:block;">API Token</label>
-              <input placeholder="shared secret from Script Properties" value="{{ backend.apiToken }}" onChange="{{ h4.apiToken }}" style="{{ inputStyle }}"/>
+              <input type="password" placeholder="shared secret from Script Properties" value="{{ backend.apiToken }}" onChange="{{ h4.apiToken }}" style="{{ inputStyle }}"/>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;">
+                <div style="font-size:11.5px;color:oklch(0.5 0.02 255);">Remember token on this device — otherwise it is kept only until this tab closes. Only enable on a computer you trust.</div>
+                <div onClick="{{ toggleRememberToken }}" style="{{ rememberToggleStyle }}"><div style="{{ rememberKnobStyle }}"></div></div>
+              </div>
               <div style="display:flex;gap:8px;margin-top:12px;">
                 <div onClick="{{ connectSheets }}" style="flex:1;background:oklch(0.28 0.06 255);color:#fff;font-size:13px;font-weight:700;padding:10px;border-radius:7px;text-align:center;cursor:pointer;">{{ sheetsConnectLabel }}</div>
                 <div onClick="{{ syncNow }}" style="flex:1;background:#fff;border:1px solid oklch(0.85 0.01 255);color:oklch(0.3 0.02 255);font-size:13px;font-weight:700;padding:10px;border-radius:7px;text-align:center;cursor:pointer;">Sync Now</div>
@@ -683,11 +705,11 @@
                     <div style="font-weight:600;">{{ rev.label }}</div>
                     <div style="color:oklch(0.55 0.02 255);font-size:11.5px;">{{ rev.timestamp }}</div>
                   </div>
-                  <span onClick="{{ rev.restore }}" style="cursor:pointer;color:oklch(0.4 0.1 255);font-size:12px;font-weight:600;">Restore</span>
+                  <span onClick="{{ rev.restore }}" style="{{ rev.restoreStyle }}">{{ rev.restoreLabel }}</span>
                 </div>
               </sc-for>
               <sc-if value="{{ revisionsEmpty }}" hint-placeholder-val="{{ false }}">
-                <div style="padding:14px 0;color:oklch(0.6 0.02 255);font-size:12.5px;">No saved revisions yet — click "Save Revision" to snapshot the current BOQ.</div>
+                <div style="padding:14px 0;color:oklch(0.6 0.02 255);font-size:12.5px;">No saved revisions yet — every save to Google Sheets is recorded here; "Save Revision" adds a labelled one.</div>
               </sc-if>
             </div>
           </div>
@@ -701,16 +723,45 @@
 
 </x-dc>
 <script type="text/x-dc" data-dc-script>
+const WORK_TYPES = ['chb','rebar','concrete','plaster','gypsum','paint'];
+
+// Per-project defaults. Every new or freshly-loaded project starts from these, never
+// from whatever the previously open project had in memory.
+const DEFAULT_FORMS = () => ({
+  chb: { length:'', height:'', thickness:'6', openingsArea:'', wastage:'5', blockCoeff:'12.5', cementCoeff:'0.12', sandCoeff:'0.013', blockPrice:'', cementPrice:'', sandPrice:'', mode:'laborOnly', pakyawRate:'' },
+  rebar: { diameter:'10', totalLength:'', wastage:'5', unitPriceKg:'', rateUnit:'kg', mode:'laborOnly', pakyawRate:'' },
+  concrete: { length:'', width:'', thickness:'', mixClass:'A', wastage:'5', cementCoeff:'9.0', sandCoeff:'0.5', gravelCoeff:'1.0', cementPrice:'', sandPrice:'', gravelPrice:'', mode:'laborOnly', pakyawRate:'' },
+  plaster: { length:'', height:'', sides:'1', wastage:'5', cementCoeff:'0.09', sandCoeff:'0.018', cementPrice:'', sandPrice:'', mode:'laborOnly', pakyawRate:'' },
+  gypsum: { type:'ceiling', area:'', wastage:'5', boardCoeff:'0.36', furringCoeff:'2.0', screwCoeff:'30', boardPrice:'', furringPrice:'', screwPrice:'', mode:'laborOnly', pakyawRate:'' },
+  paint: { area:'', coats:'2', primer:'yes', wastage:'5', coverage:'10', paintPrice:'', primerPrice:'', mode:'laborOnly', pakyawRate:'' },
+});
+const DEFAULT_SUMMARY = () => ({ equipment:'', delivery:'', overheadPct:'10', contingencyPct:'5', profitPct:'15', taxEnabled:false, taxPct:'12' });
+const DEFAULT_MATERIALS = () => [
+  {name:'Portland Cement, 40kg', unit:'bag', price:''},
+  {name:'Washed Sand', unit:'cu.m', price:''},
+  {name:'Gravel (3/4")', unit:'cu.m', price:''},
+  {name:'CHB, 4 in', unit:'pc', price:''},
+  {name:'CHB, 6 in', unit:'pc', price:''},
+  {name:'Rebar, 10mm x 6m', unit:'pc', price:''},
+  {name:'Gypsum Board, 1/2in', unit:'pc', price:''},
+  {name:'Latex Paint', unit:'liter', price:''},
+];
+const DEFAULT_LABOR = () => [
+  {name:'CHB Laying, 4"/6"', unit:'sqm', laborOnly:'', supplyInstall:''},
+  {name:'Rebar Fabrication & Install', unit:'kg', laborOnly:'', supplyInstall:''},
+  {name:'Concrete Pouring', unit:'cu.m', laborOnly:'', supplyInstall:''},
+  {name:'Plastering', unit:'sqm', laborOnly:'', supplyInstall:''},
+  {name:'Gypsum Ceiling Install', unit:'sqm', laborOnly:'', supplyInstall:''},
+  {name:'Painting, 2 coats', unit:'sqm', laborOnly:'', supplyInstall:''},
+];
+// Fields that make up one project's saved data (local cache + server snapshot).
+const SNAPSHOT_KEYS = [...WORK_TYPES, 'boq', 'boqSeq', 'summary', 'libMaterials', 'libLabor'];
+
 class Component extends DCLogic {
   state = {
     screen: 'dashboard',
     workType: 'chb',
-    chb: { length:'', height:'', thickness:'6', openingsArea:'', wastage:'5', blockCoeff:'12.5', cementCoeff:'0.12', sandCoeff:'0.013', blockPrice:'', cementPrice:'', sandPrice:'', mode:'laborOnly', pakyawRate:'' },
-    rebar: { diameter:'10', totalLength:'', wastage:'5', unitPriceKg:'', rateUnit:'kg', mode:'laborOnly', pakyawRate:'' },
-    concrete: { length:'', width:'', thickness:'', mixClass:'A', wastage:'5', cementCoeff:'9.0', sandCoeff:'0.5', gravelCoeff:'1.0', cementPrice:'', sandPrice:'', gravelPrice:'', mode:'laborOnly', pakyawRate:'' },
-    plaster: { length:'', height:'', sides:'1', wastage:'5', cementCoeff:'0.09', sandCoeff:'0.018', cementPrice:'', sandPrice:'', mode:'laborOnly', pakyawRate:'' },
-    gypsum: { type:'ceiling', area:'', wastage:'5', boardCoeff:'0.36', furringCoeff:'2.0', screwCoeff:'30', boardPrice:'', furringPrice:'', screwPrice:'', mode:'laborOnly', pakyawRate:'' },
-    paint: { area:'', coats:'2', primer:'yes', wastage:'5', coverage:'10', paintPrice:'', primerPrice:'', mode:'laborOnly', pakyawRate:'' },
+    ...DEFAULT_FORMS(),
     boq: [],
     boqSeq: 1,
     currentProjectId: 'p1',
@@ -722,92 +773,161 @@ class Component extends DCLogic {
       {id:'p5', name:'School Classroom Bldg.', type:'Institutional', status:'In Progress', value:4120750, updated:'1 week ago', owner:'J. Santos', location:'Laguna', revisions:1},
     ],
     revisions: [],
-    syncStatus: 'saved', lastSyncAt: null, pendingChanges: false, projectVersion: 1, conflictInfo: null,
-    backend: { scriptUrl:'', apiToken:'', connected:false },
+    syncStatus: 'saved', lastSyncAt: null, pendingChanges: false, conflictInfo: null,
+    projectLoading: false, loadError: null,
+    backend: { scriptUrl:'', apiToken:'', rememberToken:false, connected:false },
     syncLogEntries: [], dbHealth: null, trashedProjects: [], showTrash: false,
-    summary: { equipment:'', delivery:'', overheadPct:'10', contingencyPct:'5', profitPct:'15', taxEnabled:false, taxPct:'12' },
+    summary: DEFAULT_SUMMARY(),
     company: { name:'ABC Builders & Construction Services', address:'123 Mabini St., Quezon City, Metro Manila', contact:'(02) 8123-4567 · abc@email.com' },
     reportSettings: { terms:'Prices valid for 30 days. 50% downpayment upon approval, balance upon completion. Material price fluctuations beyond quotation validity may affect final cost.', includeSignature: true, format:'pdf' },
-    libMaterials: [
-      {name:'Portland Cement, 40kg', unit:'bag', price:''},
-      {name:'Washed Sand', unit:'cu.m', price:''},
-      {name:'Gravel (3/4")', unit:'cu.m', price:''},
-      {name:'CHB, 4 in', unit:'pc', price:''},
-      {name:'CHB, 6 in', unit:'pc', price:''},
-      {name:'Rebar, 10mm x 6m', unit:'pc', price:''},
-      {name:'Gypsum Board, 1/2in', unit:'pc', price:''},
-      {name:'Latex Paint', unit:'liter', price:''},
-    ],
-    libLabor: [
-      {name:'CHB Laying, 4"/6"', unit:'sqm', laborOnly:'', supplyInstall:''},
-      {name:'Rebar Fabrication & Install', unit:'kg', laborOnly:'', supplyInstall:''},
-      {name:'Concrete Pouring', unit:'cu.m', laborOnly:'', supplyInstall:''},
-      {name:'Plastering', unit:'sqm', laborOnly:'', supplyInstall:''},
-      {name:'Gypsum Ceiling Install', unit:'sqm', laborOnly:'', supplyInstall:''},
-      {name:'Painting, 2 coats', unit:'sqm', laborOnly:'', supplyInstall:''},
-    ],
+    libMaterials: DEFAULT_MATERIALS(),
+    libLabor: DEFAULT_LABOR(),
   };
 
+  // Server Version last seen per project, used as expectedVersion on save.
+  _versions = {};
+
   n(v){ const x = parseFloat(v); return isNaN(x) ? 0 : x; }
+  nn(v){ return Math.max(0, this.n(v)); }
   peso(v){ return '₱' + this.n(v).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2}); }
   updateForm(type, field, value){ this.setState(s => ({ [type]: { ...s[type], [field]: value } })); }
   makeHandler(type, field){ return (e) => this.updateForm(type, field, e.target.value); }
 
+  blankProjectData(){
+    return { ...DEFAULT_FORMS(), boq: [], boqSeq: 1, summary: DEFAULT_SUMMARY(), libMaterials: DEFAULT_MATERIALS(), libLabor: DEFAULT_LABOR(),
+      revisions: [], conflictInfo: null, loadError: null };
+  }
+
+  projectSnapshot(s){
+    const o = {};
+    SNAPSHOT_KEYS.forEach(k => { o[k] = s[k]; });
+    return o;
+  }
+
+  // Turns a stored snapshot (local cache or server revision) back into state, filling
+  // any missing fields from defaults so old or partial snapshots stay safe to apply.
+  snapshotToState(snap){
+    const forms = DEFAULT_FORMS();
+    const out = {};
+    WORK_TYPES.forEach(wt => { out[wt] = { ...forms[wt], ...((snap && snap[wt]) || {}) }; });
+    out.boq = Array.isArray(snap && snap.boq) ? snap.boq : [];
+    out.boqSeq = Math.max(Number(snap && snap.boqSeq) || 1, out.boq.reduce((a, b) => Math.max(a, Number(b.id) || 0), 0) + 1);
+    out.summary = { ...DEFAULT_SUMMARY(), ...((snap && snap.summary) || {}) };
+    out.libMaterials = Array.isArray(snap && snap.libMaterials) && snap.libMaterials.length ? snap.libMaterials : DEFAULT_MATERIALS();
+    out.libLabor = Array.isArray(snap && snap.libLabor) && snap.libLabor.length ? snap.libLabor : DEFAULT_LABOR();
+    return out;
+  }
+
   dataSignature(s){
-    return JSON.stringify({ pid: s.currentProjectId, chb:s.chb, rebar:s.rebar, concrete:s.concrete, plaster:s.plaster, gypsum:s.gypsum, paint:s.paint,
-      boq:s.boq, summary:s.summary, company:s.company, reportSettings:s.reportSettings, libMaterials:s.libMaterials, libLabor:s.libLabor });
+    return JSON.stringify([s.currentProjectId, this.projectSnapshot(s)]);
+  }
+
+  /** Local cache (offline copy) **/
+
+  readCache(id){
+    if (!id) return null;
+    try {
+      const raw = localStorage.getItem('qb_project_' + id);
+      if (!raw) return null;
+      const c = JSON.parse(raw);
+      if (c.version && !this._versions[id]) this._versions[id] = c.version;
+      return { data: this.snapshotToState(c), revisions: (c.revisions || []).filter(r => r.snapshot), dirty: !!c.dirty, name: c.name };
+    } catch (e) { return null; }
+  }
+
+  writeCache(dirty){
+    const S = this.state, id = S.currentProjectId;
+    if (!id) return;
+    const meta = S.projects.find(p => p.id === id) || {};
+    try {
+      localStorage.setItem('qb_project_' + id, JSON.stringify({ ...this.projectSnapshot(S), name: meta.name, dirty: !!dirty,
+        version: this._versions[id] || 1, revisions: S.revisions.filter(r => r.snapshot) }));
+    } catch (e) {}
+  }
+
+  patchCache(id, patch){
+    try {
+      const raw = localStorage.getItem('qb_project_' + id);
+      if (raw) localStorage.setItem('qb_project_' + id, JSON.stringify({ ...JSON.parse(raw), ...patch }));
+    } catch (e) {}
+  }
+
+  // Marks the current state as the saved baseline so it doesn't trigger an autosave.
+  resetBaseline(dirty){
+    this._lastSig = this.dataSignature(this.state);
+    this.writeCache(dirty);
+  }
+
+  saveBackendPrefs(){
+    const b = this.state.backend;
+    try {
+      localStorage.setItem('qb_backend', JSON.stringify({ scriptUrl: b.scriptUrl, rememberToken: !!b.rememberToken, apiToken: b.rememberToken ? b.apiToken : undefined }));
+      // Not remembered: keep the token for this browser tab only.
+      if (b.apiToken) sessionStorage.setItem('qb_token', b.apiToken); else sessionStorage.removeItem('qb_token');
+    } catch (e) {}
   }
 
   componentDidMount(){
-    this._lastSig = this.dataSignature(this.state);
+    const patch = {};
     try {
-      const savedBackend = localStorage.getItem('qb_backend');
-      if (savedBackend) this.setState({ backend: JSON.parse(savedBackend) });
-      const cached = localStorage.getItem('qb_project_' + this.state.currentProjectId);
-      if (cached) { const parsed = JSON.parse(cached); this.setState(parsed); this.appendLog('Loaded local offline copy', 'ok'); }
+      const b = JSON.parse(localStorage.getItem('qb_backend') || 'null');
+      if (b) {
+        let token = '';
+        try { token = sessionStorage.getItem('qb_token') || ''; } catch (e) {}
+        if (b.rememberToken) token = b.apiToken || token;
+        else if (b.rememberToken === undefined && b.apiToken) token = token || b.apiToken; // legacy plaintext copy, moved below
+        patch.backend = { scriptUrl: b.scriptUrl || '', apiToken: token, rememberToken: !!b.rememberToken, connected: false };
+      }
+      const prefs = JSON.parse(localStorage.getItem('qb_prefs') || 'null');
+      if (prefs && prefs.company) patch.company = { ...this.state.company, ...prefs.company };
+      if (prefs && prefs.reportSettings) patch.reportSettings = { ...this.state.reportSettings, ...prefs.reportSettings };
+      const projects = JSON.parse(localStorage.getItem('qb_projects') || 'null');
+      if (Array.isArray(projects)) patch.projects = projects;
+      const cur = localStorage.getItem('qb_current');
+      if (cur !== null) patch.currentProjectId = cur || null;
     } catch (e) {}
-    window.addEventListener('online', () => { if (this.state.pendingChanges) this.performSync(); else this.setState({syncStatus:'saved'}); });
+    this.setState(patch);
+    if (patch.backend) this.saveBackendPrefs();
+
+    const cached = this.readCache(this.state.currentProjectId);
+    this.setState({ ...this.blankProjectData(), ...(cached ? { ...cached.data, revisions: cached.revisions } : {}), pendingChanges: !!(cached && cached.dirty) });
+    this.resetBaseline(cached && cached.dirty);
+    this._lastPrefsSig = JSON.stringify([this.state.company, this.state.reportSettings]);
+    this._lastProjectsSig = JSON.stringify(this.state.projects);
+    if (cached) this.appendLog('Loaded local offline copy', 'ok');
+
+    window.addEventListener('online', () => {
+      const b = this.state.backend;
+      if (!b.connected && b.scriptUrl && b.apiToken) this.testConnection();
+      else if (this.state.pendingChanges) this.performSync();
+      else this.setState({syncStatus:'saved'});
+    });
     window.addEventListener('offline', () => this.setState({syncStatus:'offline'}));
     if (!navigator.onLine) this.setState({syncStatus:'offline'});
     setTimeout(() => { if (this.state.backend.scriptUrl && this.state.backend.apiToken) this.testConnection(); }, 100);
   }
 
-  toServerProject(){
-    const S = this.state;
-    return {
-      name: (S.projects.find(p=>p.id===S.currentProjectId)||{}).name || 'Untitled Project',
-      owner: S.company.name, location:'', type:'', status:'In Progress',
-      materials: S.libMaterials.map((m,i)=>({id:'m'+i, name:m.name, unit:m.unit, price:this.n(m.price)})),
-      laborRates: S.libLabor.map((l,i)=>({id:'l'+i, name:l.name, unit:l.unit, laborOnly:this.n(l.laborOnly), supplyInstall:this.n(l.supplyInstall)})),
-      boq: S.boq.map(b=>({id:'b'+b.id, label:b.label, qtyLabel:b.qtyLabel, materialCost:b.materialCost, laborCost:b.laborCost, mode:b.mode})),
-      summary: S.summary, estimates: [], grandTotal: 0,
-    };
-  }
-
-  fromServerBundle(bundle){
-    const materials = bundle.materials || [];
-    const laborRates = bundle.laborRates || [];
-    const boq = (bundle.boq || []).map((b,i)=>({ id:i+1, workType:'', label:b.Label, qtyLabel:b.Qty, materialCost:this.n(b.MaterialCost), laborCost:this.n(b.LaborCost), mode:b.Mode }));
-    const s = bundle.summary;
-    return {
-      libMaterials: materials.length ? materials.map(m=>({name:m.Name, unit:m.Unit, price: m.Price ? String(m.Price) : ''})) : this.state.libMaterials,
-      libLabor: laborRates.length ? laborRates.map(l=>({name:l.ScopeOfWork, unit:l.Unit, laborOnly: l.LaborOnlyRate ? String(l.LaborOnlyRate) : '', supplyInstall: l.SupplyInstallRate ? String(l.SupplyInstallRate) : ''})) : this.state.libLabor,
-      boq, boqSeq: boq.length + 1,
-      summary: s ? { equipment:String(s.Equipment||''), delivery:String(s.Delivery||''), overheadPct:String(s.OverheadPct||'10'), contingencyPct:String(s.ContingencyPct||'5'), profitPct:String(s.ProfitPct||'15'), taxEnabled:!!s.TaxEnabled, taxPct:String(s.TaxPct||'12') } : this.state.summary,
-      projectVersion: Number(bundle.project.Version || 1),
-      revisions: (bundle.revisions||[]).map(r=>({ id:r.RevisionID, label:r.Label, timestamp:r.CreatedAt, snapshot:null })),
-    };
-  }
-
   componentDidUpdate(){
-    const sig = this.dataSignature(this.state);
-    if (sig !== this._lastSig) {
-      this._lastSig = sig;
-      try { localStorage.setItem('qb_project_' + this.state.currentProjectId, sig); } catch (e) {}
-      this.setState({ syncStatus: 'saving', pendingChanges: true });
-      clearTimeout(this._syncTimer);
-      this._syncTimer = setTimeout(() => this.performSync(), 1200);
+    const S = this.state;
+    const prefsSig = JSON.stringify([S.company, S.reportSettings]);
+    if (prefsSig !== this._lastPrefsSig) {
+      this._lastPrefsSig = prefsSig;
+      try { localStorage.setItem('qb_prefs', JSON.stringify({ company: S.company, reportSettings: S.reportSettings })); } catch (e) {}
     }
+    const projectsSig = JSON.stringify(S.projects);
+    if (projectsSig !== this._lastProjectsSig) {
+      this._lastProjectsSig = projectsSig;
+      try { localStorage.setItem('qb_projects', projectsSig); } catch (e) {}
+    }
+    // Never autosave a project whose server data hasn't arrived yet.
+    if (S.projectLoading) return;
+    const sig = this.dataSignature(S);
+    if (sig === this._lastSig) return;
+    this._lastSig = sig;
+    this.writeCache(true);
+    this.setState({ syncStatus: 'saving', pendingChanges: true });
+    clearTimeout(this._syncTimer);
+    this._syncTimer = setTimeout(() => this.performSync(), 1200);
   }
 
   appendLog(text, status){
@@ -817,180 +937,410 @@ class Component extends DCLogic {
 
   clientId_(){ return 'web-' + (this._clientId || (this._clientId = Math.random().toString(36).slice(2))); }
 
-  performSync(){
-    clearTimeout(this._syncTimer);
-    if (!navigator.onLine) { this.setState({syncStatus:'offline'}); return; }
-    if (!this.state.backend.scriptUrl || !this.state.backend.connected) { this.setState({syncStatus:'offline'}); this.appendLog('No connected backend — working offline', 'warn'); return; }
-    this.setState({syncStatus:'saving'});
-    const S = this.state;
-    const payload = {
-      action: 'update_project', token: S.backend.apiToken, clientId: this.clientId_(),
-      projectId: S.currentProjectId, expectedVersion: S.projectVersion,
-      project: this.toServerProject(),
+  // All data calls are POST with the token in the body — never in a URL.
+  api(action, body){
+    const { scriptUrl, apiToken } = this.state.backend;
+    return fetch(scriptUrl, { method:'POST', body: JSON.stringify({ ...(body || {}), action, token: apiToken, clientId: this.clientId_() }) })
+      .then(r => r.json());
+  }
+
+  computeTotals(S){
+    const materialsSubtotal = S.boq.reduce((a,r)=>a+this.nn(r.materialCost),0);
+    const laborSubtotal = S.boq.reduce((a,r)=>a+this.nn(r.laborCost),0);
+    const sm = S.summary;
+    const base = materialsSubtotal + laborSubtotal + this.nn(sm.equipment) + this.nn(sm.delivery);
+    const overheadAmt = base * this.nn(sm.overheadPct)/100;
+    const contingencyAmt = base * this.nn(sm.contingencyPct)/100;
+    const profitAmt = (base+overheadAmt+contingencyAmt) * this.nn(sm.profitPct)/100;
+    const preTax = base+overheadAmt+contingencyAmt+profitAmt;
+    const taxAmt = sm.taxEnabled ? preTax * this.nn(sm.taxPct)/100 : 0;
+    return { materialsSubtotal, laborSubtotal, overheadAmt, contingencyAmt, profitAmt, taxAmt, grandTotal: preTax + taxAmt };
+  }
+
+  // Server payload built from a project snapshot (current state, cache entry, or migration source).
+  payloadFromSnapshot(snap, meta){
+    const t = this.computeTotals(snap);
+    return {
+      name: meta.name || 'Untitled Project', owner: meta.owner || '', location: meta.location || '', type: meta.type || '', status: meta.status || 'Draft',
+      value: t.grandTotal,
+      materials: snap.libMaterials.map(m=>({name:m.name, unit:m.unit, price:this.nn(m.price)})),
+      laborRates: snap.libLabor.map(l=>({name:l.name, unit:l.unit, laborOnly:this.nn(l.laborOnly), supplyInstall:this.nn(l.supplyInstall)})),
+      boq: snap.boq.map(b=>({id:'b'+b.id, label:b.label, qtyLabel:b.qtyLabel, unit:b.unit||'', materialCost:this.nn(b.materialCost), laborCost:this.nn(b.laborCost), mode:b.mode})),
+      summary: { ...snap.summary, materialsSubtotal: t.materialsSubtotal, laborSubtotal: t.laborSubtotal },
+      estimates: WORK_TYPES.map(wt => ({ workType: wt, inputs: snap[wt] })),
+      grandTotal: t.grandTotal,
+      snapshot: snap,
     };
-    fetch(S.backend.scriptUrl, { method:'POST', body: JSON.stringify(payload) })
-      .then(r => r.json())
+  }
+
+  toServerProject(){
+    const S = this.state;
+    return this.payloadFromSnapshot(this.projectSnapshot(S), S.projects.find(p=>p.id===S.currentProjectId) || {});
+  }
+
+  fromServerBundle(bundle){
+    const forms = DEFAULT_FORMS();
+    (bundle.estimates || []).forEach(e => {
+      if (!forms[e.WorkType]) return;
+      try { forms[e.WorkType] = { ...forms[e.WorkType], ...JSON.parse(e.InputsJSON || '{}') }; } catch (err) {}
+    });
+    const materials = bundle.materials || [];
+    const laborRates = bundle.laborRates || [];
+    const boq = (bundle.boq || []).map((b,i)=>({ id:i+1, workType:'', label:b.Label, qtyLabel:b.Qty, unit:b.Unit||'', materialCost:this.n(b.MaterialCost), laborCost:this.n(b.LaborCost), mode:b.Mode }));
+    const s = bundle.summary;
+    const str = (v, dflt) => v === '' || v === null || v === undefined ? dflt : String(v);
+    return {
+      ...forms,
+      libMaterials: materials.length ? materials.map(m=>({name:m.Name, unit:m.Unit, price: m.Price ? String(m.Price) : ''})) : DEFAULT_MATERIALS(),
+      libLabor: laborRates.length ? laborRates.map(l=>({name:l.ScopeOfWork, unit:l.Unit, laborOnly: l.LaborOnlyRate ? String(l.LaborOnlyRate) : '', supplyInstall: l.SupplyInstallRate ? String(l.SupplyInstallRate) : ''})) : DEFAULT_LABOR(),
+      boq, boqSeq: boq.length + 1,
+      summary: s ? { equipment:s.Equipment ? String(s.Equipment) : '', delivery:s.Delivery ? String(s.Delivery) : '', overheadPct:str(s.OverheadPct,'10'), contingencyPct:str(s.ContingencyPct,'5'),
+        profitPct:str(s.ProfitPct,'15'), taxEnabled: s.TaxEnabled === true || s.TaxEnabled === 'TRUE' || s.TaxEnabled === 'true', taxPct:str(s.TaxPct,'12') } : DEFAULT_SUMMARY(),
+      revisions: (bundle.revisions||[]).map(r=>({ id:r.RevisionID, label:r.Label, timestamp:r.CreatedAt, snapshot:null, restorable: !!r.hasSnapshot })),
+    };
+  }
+
+  /** Saving **/
+
+  buildSyncJob(revisionLabel){
+    const S = this.state;
+    const meta = S.projects.find(p => p.id === S.currentProjectId) || {};
+    return { projectId: S.currentProjectId, project: this.toServerProject(), revisionLabel, createIfMissing: !!meta.local, sig: this.dataSignature(S) };
+  }
+
+  performSync(revisionLabel){
+    clearTimeout(this._syncTimer); this._syncTimer = null;
+    const S = this.state;
+    if (!S.currentProjectId || S.projectLoading) return;
+    if (!navigator.onLine) { this.setState({syncStatus:'offline'}); return; }
+    if (!S.backend.scriptUrl || !S.backend.connected) {
+      if (S.syncStatus !== 'offline') this.appendLog('No connected backend — working offline', 'warn');
+      this.setState({syncStatus:'offline'});
+      return;
+    }
+    if (S.syncStatus === 'conflict') { this.appendLog('Saving is paused until you reload the latest version', 'warn'); return; }
+    const queued = this._queued && this._queued.projectId === S.currentProjectId ? this._queued.revisionLabel : undefined;
+    const job = this.buildSyncJob(revisionLabel || queued);
+    // One save at a time: a second request with the same expectedVersion would
+    // conflict with our own first save. Keep only the latest pending job.
+    if (this._syncInFlight) { this._queued = job; return; }
+    this.sendSync(job);
+  }
+
+  sendSync(job){
+    this._syncInFlight = true;
+    const isCurrent = () => this.state.currentProjectId === job.projectId;
+    if (isCurrent()) this.setState({syncStatus:'saving'});
+    let ok = false;
+    this.api('update_project', { projectId: job.projectId, expectedVersion: this._versions[job.projectId] || 1, project: job.project,
+      revisionLabel: job.revisionLabel, createIfMissing: job.createIfMissing })
       .then(res => {
         if (res.ok) {
-          this.setState({ syncStatus:'saved', pendingChanges:false, lastSyncAt:new Date(), projectVersion: res.version, conflictInfo:null });
-          this.appendLog('Saved v' + res.version + ' to Google Sheets', 'ok');
+          ok = true;
+          this._versions[job.projectId] = res.version;
+          this.setState(s => ({ lastSyncAt: new Date(), projects: s.projects.map(p => p.id === job.projectId
+            ? { ...p, local: false, value: job.project.value, updated: 'Just now', revisions: res.revisionNumber } : p) }));
+          this.appendLog('Saved v' + res.version + ' to Google Sheets' + (job.revisionLabel ? ' — ' + job.revisionLabel : ''), 'ok');
+          const stillDirty = !!(this._queued && this._queued.projectId === job.projectId);
+          if (isCurrent()) {
+            const dirty = stillDirty || this.dataSignature(this.state) !== job.sig;
+            const rev = { id: res.revisionId, label: res.revisionLabel, timestamp: res.savedAt, snapshot: null, restorable: !!res.hasSnapshot };
+            this.setState(s => ({ syncStatus: dirty ? 'saving' : 'saved', pendingChanges: dirty, conflictInfo: null, revisions: [rev, ...s.revisions].slice(0, 50) }));
+            this.writeCache(dirty);
+          } else if (!stillDirty) {
+            this.patchCache(job.projectId, { dirty: false, version: res.version });
+          }
         } else if (res.conflict) {
-          this.setState({ syncStatus:'conflict', conflictInfo: res });
+          if (isCurrent()) this.setState({ syncStatus:'conflict', conflictInfo: res });
           this.appendLog('Conflict: ' + res.message, 'error');
         } else {
-          this.setState({syncStatus:'error'}); this.appendLog('Sync failed: ' + (res.error || 'unknown error'), 'error');
+          if (isCurrent()) this.setState({syncStatus:'error'});
+          this.appendLog('Sync failed: ' + (res.error || 'unknown error'), 'error');
         }
       })
-      .catch(err => { this.setState({syncStatus:'error'}); this.appendLog('Sync failed: ' + err, 'error'); });
+      .catch(err => { if (isCurrent()) this.setState({syncStatus:'error'}); this.appendLog('Sync failed: ' + err, 'error'); })
+      .then(() => {
+        this._syncInFlight = false;
+        const q = this._queued; this._queued = null;
+        if (q && (ok || q.projectId !== job.projectId)) this.sendSync(q);
+      });
   }
 
   syncNow(){ this.performSync(); }
 
   reloadLatest(){
-    this.loadProject(this.state.currentProjectId);
-    this.setState({conflictInfo:null, syncStatus:'saved'});
+    this.setState({ conflictInfo:null, syncStatus:'saved', pendingChanges:false });
+    this.loadProject(this.state.currentProjectId, { keepScreen: true, fromServer: true });
   }
 
+  /** Connection & project list **/
+
   testConnection(){
-    const url = this.state.backend.scriptUrl;
-    if (!url) { this.appendLog('Enter a Web App URL first', 'warn'); return; }
-    try { localStorage.setItem('qb_backend', JSON.stringify(this.state.backend)); } catch(e) {}
-    fetch(url + '?action=ping').then(r=>r.json()).then(res => {
+    const { scriptUrl, apiToken } = this.state.backend;
+    if (!scriptUrl) { this.appendLog('Enter a Web App URL first', 'warn'); return; }
+    if (!apiToken) { this.appendLog('Enter the API token first', 'warn'); return; }
+    this.saveBackendPrefs();
+    // list_projects needs the token, so this also verifies it (ping alone would not).
+    this.api('list_projects').then(res => {
       if (res.ok) {
         this.setState(s=>({backend:{...s.backend, connected:true}}));
         this.appendLog('Connected to Google Sheets backend', 'ok');
-        this.refreshProjectList();
-      } else { this.appendLog('Connection failed: ' + (res.error||''), 'error'); }
-    }).catch(err => this.appendLog('Connection failed: ' + err, 'error'));
+        this.flushPendingDeletes();
+        this.applyProjectList(res.projects || []);
+      } else {
+        this.setState(s=>({backend:{...s.backend, connected:false}}));
+        this.appendLog('Connection failed: ' + (res.error||'unknown error'), 'error');
+      }
+    }).catch(err => { this.setState(s=>({backend:{...s.backend, connected:false}})); this.appendLog('Connection failed: ' + err, 'error'); });
   }
 
   refreshProjectList(){
-    const { scriptUrl, apiToken } = this.state.backend;
-    fetch(scriptUrl + '?action=list_projects&token=' + encodeURIComponent(apiToken)).then(r=>r.json()).then(res => {
-      if (res.ok && res.projects.length) {
-        this.setState({ projects: res.projects.map(p => ({ id:p.ProjectID, name:p.ProjectName, type:p.BuildingType||'—', status:p.Status||'Draft', value:Number(p.Value)||0, updated:p.UpdatedAt, owner:p.Owner||'—', location:p.Location||'—', revisions:0 })) });
-        this.appendLog('Loaded ' + res.projects.length + ' project(s) from Sheets', 'ok');
-      }
+    this.api('list_projects').then(res => {
+      if (res.ok) this.applyProjectList(res.projects || []);
+      else this.appendLog('Could not load project list: ' + res.error, 'error');
     }).catch(err => this.appendLog('Could not load project list: ' + err, 'error'));
   }
 
-  loadProject(id){
-    this.setState({ currentProjectId: id, boq: [], screen: 'estimator' });
-    const { scriptUrl, apiToken, connected } = this.state.backend;
-    if (connected) {
-      fetch(scriptUrl + '?action=get_project&projectId=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(apiToken))
-        .then(r => r.json())
-        .then(res => {
-          if (res.ok) { this.setState(this.fromServerBundle(res)); this.appendLog('Loaded project from Google Sheets', 'ok'); }
-          else this.appendLog('Load failed: ' + res.error, 'error');
-        }).catch(err => this.appendLog('Load failed: ' + err, 'error'));
+  // The server list replaces the local one (including the demo rows). Projects created
+  // offline and not yet on the server are kept until their first save creates them.
+  applyProjectList(serverRows){
+    const pendingDeletes = this.pendingDeletes();
+    const server = serverRows.filter(p => pendingDeletes.indexOf(p.ProjectID) === -1).map(p => ({ id:p.ProjectID, name:p.ProjectName, type:p.BuildingType||'—', status:p.Status||'Draft',
+      value:Number(p.Value)||0, updated:p.UpdatedAt, owner:p.Owner||'—', location:p.Location||'—', revisions:0 }));
+    serverRows.forEach(p => { this._versions[p.ProjectID] = Math.max(this._versions[p.ProjectID] || 1, Number(p.Version) || 1); });
+    const localOnly = this.state.projects.filter(p => p.local && !server.some(sp => sp.id === p.id));
+    const projects = [...localOnly, ...server];
+    this.setState({ projects });
+    this.appendLog('Loaded ' + server.length + ' project(s) from Sheets', 'ok');
+    const cur = this.state.currentProjectId;
+    if (cur && projects.some(p => p.id === cur)) {
+      if (localOnly.some(p => p.id === cur)) { if (this.state.pendingChanges) this.performSync(); }
+      else this.loadProject(cur, { keepScreen: true });
+    } else if (projects.length) {
+      this.loadProject(projects[0].id, { keepScreen: true });
     } else {
-      try { const cached = localStorage.getItem('qb_project_' + id); if (cached) this.setState(JSON.parse(cached)); } catch (e) {}
-      this.appendLog('Opened project (offline copy)', 'ok');
+      this.setState({ ...this.blankProjectData(), currentProjectId: null, pendingChanges: false, syncStatus: 'saved' });
+      try { localStorage.setItem('qb_current', ''); } catch (e) {}
+      this.resetBaseline(false);
     }
   }
 
+  loadProject(id, opts){
+    opts = opts || {};
+    const S = this.state;
+    // Flush unsaved edits for the project we're leaving (queued if a save is in flight).
+    if (S.pendingChanges && id !== S.currentProjectId) this.performSync();
+    const meta = S.projects.find(p => p.id === id) || {};
+    const cached = this.readCache(id);
+    const fetchServer = S.backend.connected && !meta.local && !(cached && cached.dirty && !opts.fromServer);
+    this.setState({ ...this.blankProjectData(), ...(cached ? { ...cached.data, revisions: cached.revisions } : {}),
+      currentProjectId: id, screen: opts.keepScreen ? S.screen : 'estimator', projectLoading: fetchServer,
+      pendingChanges: !!(cached && cached.dirty && !opts.fromServer) });
+    try { localStorage.setItem('qb_current', id); } catch (e) {}
+
+    if (!fetchServer) {
+      this.resetBaseline(cached && cached.dirty);
+      if (S.backend.connected && this.state.pendingChanges) {
+        this.appendLog('Opened project with unsynced local changes — saving them now', 'warn');
+        this.performSync();
+      } else {
+        this.setState({ syncStatus: S.backend.connected ? 'saved' : 'offline' });
+        this.appendLog(cached ? 'Opened project (offline copy)' : 'Opened project (no local copy yet)', cached ? 'ok' : 'warn');
+      }
+      return;
+    }
+    this.api('get_project', { projectId: id })
+      .then(res => {
+        if (this.state.currentProjectId !== id) return;
+        if (res.ok) {
+          this._versions[id] = Number(res.project.Version) || 1;
+          this.setState({ ...this.fromServerBundle(res), projectLoading: false, loadError: null, syncStatus: 'saved', pendingChanges: false });
+          this.resetBaseline(false);
+          this.appendLog('Loaded project from Google Sheets', 'ok');
+        } else {
+          this.setState({ projectLoading: false, loadError: res.error || 'unknown error' });
+          this.resetBaseline(false);
+          this.appendLog('Load failed: ' + res.error, 'error');
+        }
+      })
+      .catch(err => {
+        if (this.state.currentProjectId !== id) return;
+        this.setState({ projectLoading: false, loadError: String(err) });
+        this.resetBaseline(false);
+        this.appendLog('Load failed: ' + err, 'error');
+      });
+  }
+
   createNewProject(){
-    const { scriptUrl, apiToken, connected } = this.state.backend;
+    const S = this.state;
+    if (S.pendingChanges) this.performSync();
+    const { connected } = S.backend;
     const localId = 'p' + Date.now();
-    const baseProject = { id: localId, name:'Untitled Project', type:'Residential', status:'Draft', value:0, updated:'Just now', owner: this.state.company.name, location:'', revisions:0 };
-    this.setState(s => ({ projects: [baseProject, ...s.projects], currentProjectId: localId, boq: [], revisions: [], projectVersion: 1, screen: 'estimator' }));
+    const baseProject = { id: localId, name:'Untitled Project', type:'Residential', status:'Draft', value:0, updated:'Just now', owner: S.company.name, location:'', revisions:0, local: true };
+    this._versions[localId] = 1;
+    this.setState(s => ({ ...this.blankProjectData(), projects: [baseProject, ...s.projects], currentProjectId: localId, screen: 'estimator',
+      projectLoading: false, pendingChanges: false, syncStatus: connected ? 'saved' : 'offline' }));
+    try { localStorage.setItem('qb_current', localId); } catch (e) {}
+    this.resetBaseline(false);
     if (connected) {
-      fetch(scriptUrl, { method:'POST', body: JSON.stringify({ action:'create_project', token: apiToken, clientId: this.clientId_(), project: { name:'Untitled Project', clientGeneratedId: localId } }) })
-        .then(r=>r.json()).then(res => { if (res.ok) this.appendLog('Created project in Google Sheets', 'ok'); else this.appendLog('Create failed: ' + res.error, 'error'); })
-        .catch(err => this.appendLog('Create failed: ' + err, 'error'));
+      this.api('create_project', { project: { name: baseProject.name, owner: baseProject.owner, type: baseProject.type, status: baseProject.status, clientGeneratedId: localId } })
+        .then(res => {
+          if (res.ok) {
+            this._versions[localId] = Math.max(this._versions[localId] || 1, Number(res.version) || 1);
+            this.setState(s => ({ projects: s.projects.map(p => p.id === localId ? { ...p, local: false } : p) }));
+            this.appendLog('Created project in Google Sheets', 'ok');
+          } else this.appendLog('Create failed: ' + res.error + ' — will retry on first save', 'error');
+        })
+        .catch(err => this.appendLog('Create failed: ' + err + ' — will retry on first save', 'error'));
     } else {
       this.appendLog('Created project locally (will sync once connected)', 'warn');
     }
   }
 
+  /** Delete / trash **/
+
+  pendingDeletes(){
+    try { return JSON.parse(localStorage.getItem('qb_pending_deletes') || '[]'); } catch (e) { return []; }
+  }
+  setPendingDeletes(ids){ try { localStorage.setItem('qb_pending_deletes', JSON.stringify(ids)); } catch (e) {} }
+
+  flushPendingDeletes(){
+    this.pendingDeletes().forEach(id => {
+      this.api('delete_project', { projectId: id }).then(res => {
+        if (res.ok || res.error === 'Project not found') {
+          this.setPendingDeletes(this.pendingDeletes().filter(x => x !== id));
+          if (res.ok) this.appendLog('Synced offline deletion to Sheets', 'ok');
+        }
+      }).catch(() => {});
+    });
+  }
+
   deleteProject(id, name){
     if (!window.confirm('Delete "' + name + '"? It can be restored from Trash afterward.')) return;
-    const { scriptUrl, apiToken, connected } = this.state.backend;
+    const S = this.state;
+    const meta = S.projects.find(p => p.id === id) || {};
     this.setState(s => ({ projects: s.projects.filter(p => p.id !== id) }));
-    if (connected) {
-      fetch(scriptUrl, { method:'POST', body: JSON.stringify({ action:'delete_project', token: apiToken, clientId: this.clientId_(), projectId: id }) })
-        .then(r=>r.json()).then(res => { if (res.ok) { this.appendLog('Project moved to Trash', 'ok'); this.fetchTrash(); } else this.appendLog('Delete failed: ' + res.error, 'error'); })
-        .catch(err => this.appendLog('Delete failed: ' + err, 'error'));
+    if (id === S.currentProjectId) {
+      clearTimeout(this._syncTimer); this._syncTimer = null;
+      this.setState({ ...this.blankProjectData(), currentProjectId: null, pendingChanges: false });
+      try { localStorage.setItem('qb_current', ''); } catch (e) {}
+      this.resetBaseline(false);
+    }
+    if (meta.local) {
+      try { localStorage.removeItem('qb_project_' + id); } catch (e) {}
+      this.appendLog('Deleted unsynced local project', 'ok');
+      return;
+    }
+    if (S.backend.connected) {
+      this.api('delete_project', { projectId: id })
+        .then(res => { if (res.ok) { this.appendLog('Project moved to Trash', 'ok'); this.fetchTrash(); } else this.appendLog('Delete failed: ' + res.error, 'error'); })
+        .catch(err => { this.setPendingDeletes([...this.pendingDeletes(), id]); this.appendLog('Delete failed: ' + err + ' — will retry when connected', 'error'); });
     } else {
-      this.appendLog('Deleted locally — connect to Sheets to sync the deletion', 'warn');
+      this.setPendingDeletes([...this.pendingDeletes(), id]);
+      this.appendLog('Deleted locally — will sync the deletion once connected to Sheets', 'warn');
     }
   }
 
   fetchTrash(){
-    const { scriptUrl, apiToken, connected } = this.state.backend;
-    if (!connected) return;
-    fetch(scriptUrl + '?action=list_projects&includeDeleted=true&token=' + encodeURIComponent(apiToken)).then(r=>r.json()).then(res => {
-      if (res.ok) this.setState({ trashedProjects: res.projects.filter(p => p.IsDeleted === true || p.IsDeleted === 'TRUE').map(p => ({ id:p.ProjectID, name:p.ProjectName })) });
+    if (!this.state.backend.connected) return;
+    this.api('list_projects', { includeDeleted: true }).then(res => {
+      if (res.ok) this.setState({ trashedProjects: res.projects.filter(p => p.IsDeleted === true || p.IsDeleted === 'TRUE' || p.IsDeleted === 'true').map(p => ({ id:p.ProjectID, name:p.ProjectName })) });
     }).catch(()=>{});
   }
 
   restoreProjectFromTrash(id){
-    const { scriptUrl, apiToken } = this.state.backend;
-    fetch(scriptUrl, { method:'POST', body: JSON.stringify({ action:'restore_project', token: apiToken, clientId: this.clientId_(), projectId: id }) })
-      .then(r=>r.json()).then(res => {
+    this.api('restore_project', { projectId: id })
+      .then(res => {
         if (res.ok) { this.appendLog('Project restored', 'ok'); this.fetchTrash(); this.refreshProjectList(); }
         else this.appendLog('Restore failed: ' + res.error, 'error');
       }).catch(err => this.appendLog('Restore failed: ' + err, 'error'));
   }
 
   migrateLocalData(){
-    const { scriptUrl, apiToken, connected } = this.state.backend;
-    if (!connected) { this.appendLog('Connect to Google Sheets before migrating', 'warn'); return; }
+    if (!this.state.backend.connected) { this.appendLog('Connect to Google Sheets before migrating', 'warn'); return; }
     const entries = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key && key.indexOf('qb_project_') === 0) {
         try {
-          const data = JSON.parse(localStorage.getItem(key));
-          entries.push({ clientGeneratedId: key.replace('qb_project_',''), project: {
-            name: 'Migrated Project (' + key.replace('qb_project_','') + ')',
-            materials: (data.libMaterials||[]).map((m,i)=>({id:'m'+i, name:m.name, unit:m.unit, price:this.n(m.price)})),
-            laborRates: (data.libLabor||[]).map((l,i)=>({id:'l'+i, name:l.name, unit:l.unit, laborOnly:this.n(l.laborOnly), supplyInstall:this.n(l.supplyInstall)})),
-            boq: (data.boq||[]).map(b=>({id:'b'+b.id, label:b.label, qtyLabel:b.qtyLabel, materialCost:b.materialCost, laborCost:b.laborCost, mode:b.mode})),
-            summary: data.summary || this.state.summary, estimates: [], grandTotal: 0,
-          }});
+          const id = key.replace('qb_project_','');
+          const raw = JSON.parse(localStorage.getItem(key));
+          const snap = this.snapshotToState(raw);
+          entries.push({ clientGeneratedId: id, project: this.payloadFromSnapshot(snap, { name: raw.name || ('Migrated Project (' + id + ')') }) });
         } catch (e) {}
       }
     }
     if (!entries.length) { this.appendLog('No local offline projects found to migrate', 'warn'); return; }
-    fetch(scriptUrl, { method:'POST', body: JSON.stringify({ action:'migrate_push', token: apiToken, clientId: this.clientId_(), localProjects: entries }) })
-      .then(r=>r.json()).then(res => {
+    this.api('migrate_push', { localProjects: entries })
+      .then(res => {
         if (res.ok) { this.appendLog('Migration: ' + res.results.map(r=>r.status).join(', '), 'ok'); this.refreshProjectList(); }
         else this.appendLog('Migration failed: ' + res.error, 'error');
       }).catch(err => this.appendLog('Migration failed: ' + err, 'error'));
   }
 
   runHealthCheck(){
-    const { scriptUrl, apiToken, connected } = this.state.backend;
-    if (!connected) { this.appendLog('Connect to Google Sheets first', 'warn'); return; }
-    fetch(scriptUrl + '?action=health_check&token=' + encodeURIComponent(apiToken)).then(r=>r.json()).then(res => {
+    if (!this.state.backend.connected) { this.appendLog('Connect to Google Sheets first', 'warn'); return; }
+    this.api('health_check').then(res => {
       if (res.ok) { this.setState({ dbHealth: res }); this.appendLog('Health check OK', 'ok'); }
       else this.appendLog('Health check failed: ' + res.error, 'error');
     }).catch(err => this.appendLog('Health check failed: ' + err, 'error'));
   }
 
+  /** Revisions **/
+
+  // Connected: a labelled save on the server (stored with a full snapshot, so it can be
+  // restored later from any browser). Offline: a local-only snapshot in this browser.
   saveRevision(){
     const S = this.state;
-    const label = 'Revision ' + (S.revisions.length + 1);
-    const snapshot = JSON.parse(this.dataSignature(S));
-    this.setState(s => ({ revisions: [{ id:'rev'+(s.revisions.length+1), label, timestamp: new Date().toLocaleString(), snapshot }, ...s.revisions] }));
-    this.appendLog('Saved ' + label, 'ok');
+    if (!S.currentProjectId) { this.appendLog('Open or create a project first', 'warn'); return; }
+    const label = 'Manual revision — ' + new Date().toLocaleString();
+    if (S.backend.connected && navigator.onLine) {
+      this.appendLog('Saving ' + label + '…', 'ok');
+      this.performSync(label);
+      return;
+    }
+    const rev = { id: 'local-' + Date.now(), label: label + ' (local only)', timestamp: new Date().toISOString(), snapshot: this.projectSnapshot(S), restorable: true };
+    this.setState(s => ({ revisions: [rev, ...s.revisions] }));
+    this.writeCache(this.state.pendingChanges);
+    this.appendLog('Saved ' + rev.label, 'ok');
   }
 
   restoreRevision(rev){
-    this.setState({ ...rev.snapshot });
-    this.appendLog('Restored ' + rev.label, 'ok');
+    const S = this.state;
+    if (!rev.restorable) { this.appendLog('"' + rev.label + '" has no stored snapshot (saved before snapshots were added) — cannot restore', 'warn'); return; }
+    if (!window.confirm('Restore "' + rev.label + '"? The current BOQ, prices and cost summary will be replaced. The current state stays in the revision history.')) return;
+    if (rev.snapshot) {
+      this.setState(this.snapshotToState(rev.snapshot));
+      this.appendLog('Restored ' + rev.label, 'ok');
+      return;
+    }
+    if (!S.backend.connected) { this.appendLog('Connect to Google Sheets to restore a server revision', 'warn'); return; }
+    const pid = S.currentProjectId;
+    this.appendLog('Restoring ' + rev.label + '…', 'ok');
+    this.api('restore_revision', { projectId: pid, revisionId: rev.id })
+      .then(res => {
+        if (this.state.currentProjectId !== pid) return;
+        if (res.ok && res.snapshot) {
+          // Applying it triggers a normal autosave, which records the restore as a new revision.
+          this.setState(this.snapshotToState(res.snapshot));
+          this.appendLog('Restored ' + rev.label + ' — saving as a new revision', 'ok');
+        } else this.appendLog('Restore failed: ' + (res.error || 'no snapshot returned'), 'error');
+      })
+      .catch(err => this.appendLog('Restore failed: ' + err, 'error'));
   }
+
+  /** Export **/
 
   exportToExcel(){
     const S = this.state;
-    let rows = [['Item','Qty','Mode','Material Cost','Labor Cost','Line Total']];
-    S.boq.forEach(r => rows.push([r.label, r.qtyLabel, r.mode, r.materialCost.toFixed(2), r.laborCost.toFixed(2), (r.materialCost+r.laborCost).toFixed(2)]));
-    const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g,'""') + '"').join(',')).join('\n');
+    // Formula-injection guard: Excel/Sheets evaluate cells starting with = + - @.
+    const cell = c => { let v = String(c); if (/^[=+\-@\t\r]/.test(v)) v = "'" + v; return '"' + v.replace(/"/g,'""') + '"'; };
+    const rows = [['Item','Qty','Unit','Mode','Material Cost','Labor Cost','Line Total']];
+    S.boq.forEach(r => rows.push([r.label, r.qtyLabel, r.unit||'', r.mode, this.nn(r.materialCost).toFixed(2), this.nn(r.laborCost).toFixed(2), (this.nn(r.materialCost)+this.nn(r.laborCost)).toFixed(2)]));
+    const csv = rows.map(r => r.map(cell).join(',')).join('\n');
     const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
     const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob); link.download = 'BOQ_' + S.currentProjectId + '.csv';
+    link.href = URL.createObjectURL(blob); link.download = 'BOQ_' + (S.currentProjectId || 'export') + '.csv';
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
   }
 
@@ -999,64 +1349,78 @@ class Component extends DCLogic {
     else window.print();
   }
 
+  /** Calculator **/
+
+  // Negative inputs are clamped to 0. Wastage inflates MATERIAL quantities only;
+  // pakyaw labor is paid on the net (un-wasted) quantity for every work type,
+  // and the BOQ quantity is the net quantity.
   computeCalc(){
     const wt = this.state.workType, f = this.state[wt];
-    let rows = [], materialCost = 0, laborCost = 0, unit = 'sqm', qtyBase = 0, qtyLabel = '', desc = '';
-    const waste = 1 + this.n(f.wastage)/100;
+    const p = v => this.nn(v);
+    let rows = [], materialCost = 0, laborCost = 0, unit = 'sqm', qtyUnit = 'sqm', qtyBase = 0, qtyLabel = '', desc = '';
+    const waste = 1 + p(f.wastage)/100;
     const supply = f.mode === 'supplyInstall';
+    const rate = p(f.pakyawRate);
     if (wt === 'chb') {
-      const area = Math.max(0, this.n(f.length)*this.n(f.height) - this.n(f.openingsArea));
-      const blocks = area*this.n(f.blockCoeff)*waste, cement = area*this.n(f.cementCoeff)*waste, sand = area*this.n(f.sandCoeff)*waste;
+      const area = Math.max(0, p(f.length)*p(f.height) - p(f.openingsArea));
+      const blocks = area*p(f.blockCoeff)*waste, cement = area*p(f.cementCoeff)*waste, sand = area*p(f.sandCoeff)*waste;
       rows = [ {label:'Wall Area', value: area.toFixed(2)+' sqm'}, {label:'CHB Blocks', value: Math.ceil(blocks)+' pcs'}, {label:'Cement', value: cement.toFixed(2)+' bags'}, {label:'Sand', value: sand.toFixed(2)+' cu.m'} ];
-      materialCost = supply ? 0 : blocks*this.n(f.blockPrice) + cement*this.n(f.cementPrice) + sand*this.n(f.sandPrice);
-      laborCost = area*this.n(f.pakyawRate); unit = 'sqm'; qtyBase = area; qtyLabel = area.toFixed(2)+' sqm';
+      materialCost = supply ? 0 : blocks*p(f.blockPrice) + cement*p(f.cementPrice) + sand*p(f.sandPrice);
+      laborCost = area*rate; unit = 'sqm'; qtyUnit = 'sqm'; qtyBase = area; qtyLabel = area.toFixed(2)+' sqm';
       desc = 'CHB Wall, '+f.thickness+'in — '+area.toFixed(1)+' sqm';
     } else if (wt === 'rebar') {
-      const d = this.n(f.diameter), unitWeight = (d*d)/162, totalKg = this.n(f.totalLength)*unitWeight*waste;
-      rows = [ {label:'Unit Weight', value: unitWeight.toFixed(3)+' kg/m'}, {label:'Total Weight', value: totalKg.toFixed(2)+' kg'} ];
-      materialCost = supply ? 0 : totalKg*this.n(f.unitPriceKg);
-      const basis = f.rateUnit === 'lm' ? this.n(f.totalLength) : totalKg;
-      laborCost = basis*this.n(f.pakyawRate); unit = f.rateUnit; qtyBase = totalKg; qtyLabel = totalKg.toFixed(1)+' kg';
-      desc = 'Rebar Ø'+f.diameter+'mm — '+totalKg.toFixed(1)+' kg';
+      const d = p(f.diameter), unitWeight = (d*d)/162, length = p(f.totalLength);
+      const netKg = length*unitWeight, totalKg = netKg*waste;
+      rows = [ {label:'Unit Weight', value: unitWeight.toFixed(3)+' kg/m'}, {label:'Net Weight', value: netKg.toFixed(2)+' kg'}, {label:'Weight incl. Wastage', value: totalKg.toFixed(2)+' kg'} ];
+      materialCost = supply ? 0 : totalKg*p(f.unitPriceKg);
+      const basis = f.rateUnit === 'lm' ? length : netKg;
+      laborCost = basis*rate; unit = f.rateUnit; qtyUnit = 'kg'; qtyBase = netKg; qtyLabel = netKg.toFixed(1)+' kg';
+      desc = 'Rebar Ø'+f.diameter+'mm — '+netKg.toFixed(1)+' kg';
     } else if (wt === 'concrete') {
-      const vol = Math.max(0, this.n(f.length)*this.n(f.width)*this.n(f.thickness))*waste;
-      const cement = vol*this.n(f.cementCoeff), sand = vol*this.n(f.sandCoeff), gravel = vol*this.n(f.gravelCoeff);
-      rows = [ {label:'Volume', value: vol.toFixed(2)+' cu.m'}, {label:'Cement', value: cement.toFixed(2)+' bags'}, {label:'Sand', value: sand.toFixed(2)+' cu.m'}, {label:'Gravel', value: gravel.toFixed(2)+' cu.m'} ];
-      materialCost = supply ? 0 : cement*this.n(f.cementPrice) + sand*this.n(f.sandPrice) + gravel*this.n(f.gravelPrice);
-      laborCost = vol*this.n(f.pakyawRate); unit = 'cu.m'; qtyBase = vol; qtyLabel = vol.toFixed(2)+' cu.m';
-      desc = 'Concrete Class '+f.mixClass+' — '+vol.toFixed(2)+' cu.m';
+      const netVol = p(f.length)*p(f.width)*p(f.thickness), vol = netVol*waste;
+      const cement = vol*p(f.cementCoeff), sand = vol*p(f.sandCoeff), gravel = vol*p(f.gravelCoeff);
+      rows = [ {label:'Net Volume', value: netVol.toFixed(2)+' cu.m'}, {label:'Volume incl. Wastage', value: vol.toFixed(2)+' cu.m'}, {label:'Cement', value: cement.toFixed(2)+' bags'}, {label:'Sand', value: sand.toFixed(2)+' cu.m'}, {label:'Gravel', value: gravel.toFixed(2)+' cu.m'} ];
+      materialCost = supply ? 0 : cement*p(f.cementPrice) + sand*p(f.sandPrice) + gravel*p(f.gravelPrice);
+      laborCost = netVol*rate; unit = 'cu.m'; qtyUnit = 'cu.m'; qtyBase = netVol; qtyLabel = netVol.toFixed(2)+' cu.m';
+      desc = 'Concrete Class '+f.mixClass+' — '+netVol.toFixed(2)+' cu.m';
     } else if (wt === 'plaster') {
-      const area = this.n(f.length)*this.n(f.height)*this.n(f.sides)*waste;
-      const cement = area*this.n(f.cementCoeff), sand = area*this.n(f.sandCoeff);
-      rows = [ {label:'Plastered Area', value: area.toFixed(2)+' sqm'}, {label:'Cement', value: cement.toFixed(2)+' bags'}, {label:'Sand', value: sand.toFixed(2)+' cu.m'} ];
-      materialCost = supply ? 0 : cement*this.n(f.cementPrice) + sand*this.n(f.sandPrice);
-      laborCost = area*this.n(f.pakyawRate); unit = 'sqm'; qtyBase = area; qtyLabel = area.toFixed(2)+' sqm';
-      desc = 'Plastering, '+(f.sides==='2'?'2 sides':'1 side')+' — '+area.toFixed(1)+' sqm';
+      const netArea = p(f.length)*p(f.height)*p(f.sides), area = netArea*waste;
+      const cement = area*p(f.cementCoeff), sand = area*p(f.sandCoeff);
+      rows = [ {label:'Plastered Area', value: netArea.toFixed(2)+' sqm'}, {label:'Area incl. Wastage', value: area.toFixed(2)+' sqm'}, {label:'Cement', value: cement.toFixed(2)+' bags'}, {label:'Sand', value: sand.toFixed(2)+' cu.m'} ];
+      materialCost = supply ? 0 : cement*p(f.cementPrice) + sand*p(f.sandPrice);
+      laborCost = netArea*rate; unit = 'sqm'; qtyUnit = 'sqm'; qtyBase = netArea; qtyLabel = netArea.toFixed(2)+' sqm';
+      desc = 'Plastering, '+(f.sides==='2'?'2 sides':'1 side')+' — '+netArea.toFixed(1)+' sqm';
     } else if (wt === 'gypsum') {
-      const area = this.n(f.area)*waste;
-      const boards = area*this.n(f.boardCoeff), furring = area*this.n(f.furringCoeff), screws = area*this.n(f.screwCoeff);
-      rows = [ {label:'Area', value: area.toFixed(2)+' sqm'}, {label:'Gypsum Boards', value: Math.ceil(boards)+' pcs'}, {label:'Metal Furring', value: furring.toFixed(1)+' lm'}, {label:'Screws', value: Math.ceil(screws)+' pcs'} ];
-      materialCost = supply ? 0 : boards*this.n(f.boardPrice) + furring*this.n(f.furringPrice) + screws*this.n(f.screwPrice);
-      laborCost = area*this.n(f.pakyawRate); unit = 'sqm'; qtyBase = area; qtyLabel = area.toFixed(2)+' sqm';
-      desc = 'Gypsum '+(f.type==='partition'?'Partition':'Ceiling')+' — '+area.toFixed(1)+' sqm';
+      const netArea = p(f.area), area = netArea*waste;
+      const boards = area*p(f.boardCoeff), furring = area*p(f.furringCoeff), screws = area*p(f.screwCoeff);
+      rows = [ {label:'Area', value: netArea.toFixed(2)+' sqm'}, {label:'Area incl. Wastage', value: area.toFixed(2)+' sqm'}, {label:'Gypsum Boards', value: Math.ceil(boards)+' pcs'}, {label:'Metal Furring', value: furring.toFixed(1)+' lm'}, {label:'Screws', value: Math.ceil(screws)+' pcs'} ];
+      materialCost = supply ? 0 : boards*p(f.boardPrice) + furring*p(f.furringPrice) + screws*p(f.screwPrice);
+      laborCost = netArea*rate; unit = 'sqm'; qtyUnit = 'sqm'; qtyBase = netArea; qtyLabel = netArea.toFixed(2)+' sqm';
+      desc = 'Gypsum '+(f.type==='partition'?'Partition':'Ceiling')+' — '+netArea.toFixed(1)+' sqm';
     } else if (wt === 'paint') {
-      const area = this.n(f.area);
-      const liters = (area*this.n(f.coats)/Math.max(1,this.n(f.coverage)))*waste;
-      const primerLiters = f.primer === 'yes' ? (area/Math.max(1,this.n(f.coverage)))*waste : 0;
+      const area = p(f.area), coverage = Math.max(1, p(f.coverage));
+      const liters = (area*p(f.coats)/coverage)*waste;
+      const primerLiters = f.primer === 'yes' ? (area/coverage)*waste : 0;
       rows = [ {label:'Area', value: area.toFixed(2)+' sqm'}, {label:'Paint Needed', value: liters.toFixed(2)+' L'}, {label:'Primer Needed', value: primerLiters.toFixed(2)+' L'} ];
-      materialCost = supply ? 0 : liters*this.n(f.paintPrice) + primerLiters*this.n(f.primerPrice);
-      laborCost = area*this.n(f.pakyawRate); unit = 'sqm'; qtyBase = area; qtyLabel = area.toFixed(2)+' sqm';
+      materialCost = supply ? 0 : liters*p(f.paintPrice) + primerLiters*p(f.primerPrice);
+      laborCost = area*rate; unit = 'sqm'; qtyUnit = 'sqm'; qtyBase = area; qtyLabel = area.toFixed(2)+' sqm';
       desc = 'Painting, '+f.coats+' coats — '+area.toFixed(1)+' sqm';
     }
-    return { rows, materialCost, laborCost, materialCostFmt: this.peso(materialCost), laborCostFmt: this.peso(laborCost), lineTotalFmt: this.peso(materialCost+laborCost), unit, qtyBase, qtyLabel, desc, mode: f.mode };
+    return { rows, materialCost, laborCost, materialCostFmt: this.peso(materialCost), laborCostFmt: this.peso(laborCost), lineTotalFmt: this.peso(materialCost+laborCost), unit, qtyUnit, qtyBase, qtyLabel, desc, mode: f.mode };
   }
 
   addToBoq(){
+    if (!this.state.currentProjectId) { this.appendLog('Open or create a project before adding BOQ items', 'warn'); return; }
     const calc = this.computeCalc();
     if (calc.qtyBase <= 0) return;
+    // Ignore an identical line added again within a moment (double click / double tap).
+    const sig = JSON.stringify([this.state.workType, calc.desc, calc.materialCost, calc.laborCost, calc.mode]);
+    const now = Date.now();
+    if (this._lastAdd && this._lastAdd.sig === sig && now - this._lastAdd.at < 800) return;
+    this._lastAdd = { sig, at: now };
     const id = this.state.boqSeq;
     this.setState(s => ({
-      boq: [...s.boq, { id, workType: s.workType, label: calc.desc, qtyLabel: calc.qtyLabel, materialCost: calc.materialCost, laborCost: calc.laborCost, mode: calc.mode }],
+      boq: [...s.boq, { id, workType: s.workType, label: calc.desc, qtyLabel: calc.qtyLabel, unit: calc.qtyUnit, materialCost: calc.materialCost, laborCost: calc.laborCost, mode: calc.mode }],
       boqSeq: id + 1,
     }));
   }
@@ -1064,10 +1428,6 @@ class Component extends DCLogic {
 
   renderVals() {
     const S = this.state;
-    const nav = [
-      {key:'dashboard', label:'Dashboard'}, {key:'projects', label:'Projects'}, {key:'estimator', label:'Estimator'},
-      {key:'boq', label:'BOQ / Reports — ', hide:true},
-    ];
     const navDefs = [
       {key:'dashboard', label:'Dashboard'}, {key:'projects', label:'Projects'}, {key:'estimator', label:'Estimator'},
       {key:'boq', label:'Bill of Quantities'}, {key:'library', label:'Cost Library'}, {key:'reports', label:'Reports'}, {key:'settings', label:'Settings'},
@@ -1117,32 +1477,24 @@ class Component extends DCLogic {
       taxPct: e => this.setState(s => ({summary:{...s.summary, taxPct:e.target.value}})),
     };
 
-    const materialsSubtotal = S.boq.reduce((a,r)=>a+r.materialCost,0);
-    const laborSubtotal = S.boq.reduce((a,r)=>a+r.laborCost,0);
-    const base = materialsSubtotal + laborSubtotal + this.n(summary.equipment) + this.n(summary.delivery);
-    const overheadAmt = base * this.n(summary.overheadPct)/100;
-    const contingencyAmt = base * this.n(summary.contingencyPct)/100;
-    const profitAmt = (base+overheadAmt+contingencyAmt) * this.n(summary.profitPct)/100;
-    const preTax = base+overheadAmt+contingencyAmt+profitAmt;
-    const taxAmt = summary.taxEnabled ? preTax * this.n(summary.taxPct)/100 : 0;
-    const grandTotal = preTax + taxAmt;
+    const { materialsSubtotal, laborSubtotal, overheadAmt, contingencyAmt, profitAmt, taxAmt, grandTotal } = this.computeTotals(S);
 
     const summaryRows = [
       {label:'Materials Subtotal', value: this.peso(materialsSubtotal)},
       {label:'Pakyaw Labor Subtotal', value: this.peso(laborSubtotal)},
-      {label:'Equipment', value: this.peso(summary.equipment)},
-      {label:'Delivery', value: this.peso(summary.delivery)},
-      {label:'Overhead ('+this.n(summary.overheadPct)+'%)', value: this.peso(overheadAmt)},
-      {label:'Contingency ('+this.n(summary.contingencyPct)+'%)', value: this.peso(contingencyAmt)},
-      {label:'Profit ('+this.n(summary.profitPct)+'%)', value: this.peso(profitAmt)},
+      {label:'Equipment', value: this.peso(this.nn(summary.equipment))},
+      {label:'Delivery', value: this.peso(this.nn(summary.delivery))},
+      {label:'Overhead ('+this.nn(summary.overheadPct)+'%)', value: this.peso(overheadAmt)},
+      {label:'Contingency ('+this.nn(summary.contingencyPct)+'%)', value: this.peso(contingencyAmt)},
+      {label:'Profit ('+this.nn(summary.profitPct)+'%)', value: this.peso(profitAmt)},
     ];
-    if (summary.taxEnabled) summaryRows.push({label:'VAT ('+this.n(summary.taxPct)+'%)', value: this.peso(taxAmt)});
+    if (summary.taxEnabled) summaryRows.push({label:'VAT ('+this.nn(summary.taxPct)+'%)', value: this.peso(taxAmt)});
 
     const boqRows = S.boq.map(r => ({
       label: r.label, qtyLabel: r.qtyLabel,
       modeLabel: r.mode === 'supplyInstall' ? 'Supply & Install' : 'Labor Only',
       modeBadge: `display:inline-block;padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;background:${r.mode==='supplyInstall'?'oklch(0.95 0.03 155)':'oklch(0.95 0.015 255)'};color:${r.mode==='supplyInstall'?'oklch(0.4 0.1 155)':'oklch(0.4 0.02 255)'};`,
-      materialFmt: r.materialCost>0 ? this.peso(r.materialCost) : 'Included',
+      materialFmt: r.materialCost>0 ? this.peso(r.materialCost) : (r.mode === 'supplyInstall' ? 'Included' : this.peso(0)),
       laborFmt: this.peso(r.laborCost),
       totalFmt: this.peso(r.materialCost+r.laborCost),
       remove: () => this.removeBoqRow(r.id),
@@ -1155,9 +1507,11 @@ class Component extends DCLogic {
       terms: e => this.setState(s=>({reportSettings:{...s.reportSettings, terms:e.target.value}})),
     };
     const h4 = {
-      scriptUrl: e => this.setState(s=>({backend:{...s.backend, scriptUrl:e.target.value}})),
-      apiToken: e => this.setState(s=>({backend:{...s.backend, apiToken:e.target.value}})),
+      // Changing either one requires reconnecting, which re-verifies the token.
+      scriptUrl: e => this.setState(s=>({backend:{...s.backend, scriptUrl:e.target.value.trim(), connected:false}})),
+      apiToken: e => this.setState(s=>({backend:{...s.backend, apiToken:e.target.value.trim(), connected:false}})),
     };
+    const toggleRememberToken = () => { this.setState(s=>({backend:{...s.backend, rememberToken: !s.backend.rememberToken}})); this.saveBackendPrefs(); };
 
     const libMaterials = S.libMaterials.map((m,i) => ({ ...m, onChange: e => this.setState(s=>{ const arr=[...s.libMaterials]; arr[i]={...arr[i],price:e.target.value}; return {libMaterials:arr}; }) }));
     const libLabor = S.libLabor.map((l,i) => ({ ...l,
@@ -1190,7 +1544,12 @@ class Component extends DCLogic {
       {app:'Cost Summary', sheet:"Sheet 'CostSummary'"}, {app:'Revision Log', sheet:"Sheet 'Revisions'"},
     ];
     const syncLog = S.syncLogEntries.length ? S.syncLogEntries : [ {text:'No sync activity yet', dotColor:'oklch(0.7 0.01 255)', time:'—'} ];
-    const revisionsList = S.revisions.map(r => ({ ...r, restore: () => this.restoreRevision(r) }));
+    const fmtTime = t => { const d = new Date(t); return isNaN(d.getTime()) ? String(t || '') : d.toLocaleString(); };
+    const revisionsList = S.revisions.slice(0, 30).map(r => ({ ...r, timestamp: fmtTime(r.timestamp),
+      restoreLabel: r.restorable ? 'Restore' : 'No snapshot',
+      restoreStyle: r.restorable ? 'cursor:pointer;color:oklch(0.4 0.1 255);font-size:12px;font-weight:600;' : 'color:oklch(0.65 0.01 255);font-size:12px;',
+      restore: () => this.restoreRevision(r) }));
+    const currentMeta = S.projects.find(p=>p.id===S.currentProjectId);
 
     return {
       screen: S.screen, screenTitle: screenTitles[S.screen], autosaveTime:'just now',
@@ -1241,7 +1600,13 @@ class Component extends DCLogic {
       sheetsConnectLabel: S.backend.connected ? 'Reconnect' : 'Connect',
       connectSheets: () => this.testConnection(),
       sheetMapping, syncLog, revisionsList, revisionsEmpty: S.revisions.length===0,
-      currentProjectName: (S.projects.find(p=>p.id===S.currentProjectId)||{}).name || 'Untitled',
+      currentProjectName: S.currentProjectId ? ((currentMeta||{}).name || 'Untitled') : 'No project open',
+      noProject: !S.currentProjectId,
+      projectLoading: S.projectLoading, hasLoadError: !!S.loadError, loadError: S.loadError,
+      dismissLoadError: () => this.setState({ loadError: null }),
+      toggleRememberToken,
+      rememberToggleStyle: `width:34px;height:19px;border-radius:10px;background:${S.backend.rememberToken?'oklch(0.55 0.13 155)':'oklch(0.88 0.01 255)'};cursor:pointer;position:relative;padding:2px;box-sizing:border-box;flex-shrink:0;`,
+      rememberKnobStyle: `width:15px;height:15px;border-radius:50%;background:#fff;transform:translateX(${S.backend.rememberToken?'15px':'0'});transition:transform 0.15s;`,
       syncNow: () => this.syncNow(), saveRevision: () => this.saveRevision(), createNewProject: () => this.createNewProject(),
       exportReport: () => this.exportReport(),
       syncStatusLabel: { saved: 'Saved' + (S.lastSyncAt ? ' ' + S.lastSyncAt.toLocaleTimeString() : ''), saving: 'Saving…', offline: 'Offline — working locally', error: 'Sync Failed — tap to retry', conflict: 'Conflict — reload needed' }[S.syncStatus],
