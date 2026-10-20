@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  body{margin:0;background:oklch(0.985 0.003 255);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;color:oklch(0.22 0.015 255);}
+  a{color:oklch(0.4 0.1 255);text-decoration:none;}
+  a:hover{color:oklch(0.3 0.1 255);text-decoration:underline;}
+  input,select{font-family:inherit;}
+  input::placeholder{color:oklch(0.65 0.01 255);}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:oklch(0.85 0.01 255);border-radius:4px;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+</style>
+</helmet>
+<div style="display:flex;min-height:100vh;width:100%;">
+
+  <div style="width:220px;flex-shrink:0;background:oklch(0.19 0.035 255);display:flex;flex-direction:column;padding:20px 0;">
+    <div style="padding:0 20px 20px 20px;border-bottom:1px solid oklch(0.3 0.04 255 / 0.5);margin-bottom:12px;">
+      <div style="font-size:17px;font-weight:700;color:#fff;letter-spacing:0.2px;">QuantaBuild</div>
+      <div style="font-size:11px;color:oklch(0.7 0.02 255);margin-top:2px;">Material &amp; Pakyaw Estimator</div>
+    </div>
+    <sc-for list="{{ navItems }}" as="item" hint-placeholder-count="6">
+      <div onClick="{{ item.onClick }}" style="{{ item.style }}">
+        <div style="width:6px;height:6px;border-radius:50%;background:{{ item.dotColor }};flex-shrink:0;"></div>
+        <div style="font-size:14px;font-weight:{{ item.weight }};">{{ item.label }}</div>
+      </div>
+    </sc-for>
+    <div style="margin-top:auto;padding:14px 20px;border-top:1px solid oklch(0.3 0.04 255 / 0.5);">
+      <div style="font-size:11px;color:oklch(0.65 0.02 255);">Logged in as</div>
+      <div style="font-size:13px;color:#fff;font-weight:600;margin-top:2px;">J. Santos, QS</div>
+    </div>
+  </div>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+
+    <div style="height:56px;flex-shrink:0;background:#fff;border-bottom:1px solid oklch(0.89 0.01 255);display:flex;align-items:center;justify-content:space-between;padding:0 28px;">
+      <div style="font-size:15px;font-weight:600;">{{ screenTitle }}</div>
+      <div style="display:flex;align-items:center;gap:18px;">
+        <div onClick="{{ syncNow }}" style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:oklch(0.5 0.02 255);cursor:pointer;" title="Click to sync now">
+          <div style="{{ syncDotStyle }}"></div>
+          {{ syncStatusLabel }}
+        </div>
+        <div style="width:1px;height:20px;background:oklch(0.89 0.01 255);"></div>
+        <div style="width:32px;height:32px;border-radius:50%;background:oklch(0.94 0.02 255);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:oklch(0.28 0.06 255);">JS</div>
+      </div>
+    </div>
+
+    <sc-if value="{{ isConflict }}" hint-placeholder-val="{{ false }}">
+      <div style="background:oklch(0.97 0.03 25);border-bottom:1px solid oklch(0.85 0.1 25);padding:10px 28px;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:oklch(0.4 0.15 25);">
+        <div>⚠ This project changed on the server since you last loaded it — saving is paused to avoid overwriting that change.</div>
+        <div onClick="{{ reloadLatest }}" style="background:oklch(0.5 0.15 25);color:#fff;font-weight:700;padding:7px 14px;border-radius:6px;cursor:pointer;">Reload Latest Version</div>
+      </div>
+    </sc-if>
+
+    <div style="flex:1;overflow:auto;padding:28px;">
+
+      <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ true }}">
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;">
+          <div>
+            <div style="font-size:22px;font-weight:700;">Dashboard</div>
+            <div style="font-size:13px;color:oklch(0.5 0.02 255);margin-top:3px;">Overview of all active projects and estimates.</div>
+          </div>
+          <div onClick="{{ goEstimator }}" style="background:oklch(0.28 0.06 255);color:#fff;font-size:13.5px;font-weight:600;padding:10px 18px;border-radius:7px;cursor:pointer;">+ New Estimate</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:24px;">
+          <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+            <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;padding:18px;min-width:0;">
+              <div style="font-size:12px;color:oklch(0.52 0.02 255);font-weight:600;text-transform:uppercase;letter-spacing:0.4px;">{{ k.label }}</div>
+              <div style="font-size:21px;font-weight:700;margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ k.value }}">{{ k.value }}</div>
+              <div style="font-size:12px;margin-top:6px;color:{{ k.subColor }};">{{ k.sub }}</div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;overflow:hidden;">
+          <div style="padding:16px 20px;border-bottom:1px solid oklch(0.93 0.01 255);font-size:14.5px;font-weight:700;">Recent Projects</div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:oklch(0.98 0.004 255);">
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Project</th>
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Type</th>
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Status</th>
+                <th style="text-align:right;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Est. Value</th>
+                <th style="text-align:right;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ recentProjects }}" as="rp" hint-placeholder-count="5">
+                <tr style="border-top:1px solid oklch(0.94 0.01 255);">
+                  <td style="padding:12px 20px;font-weight:600;">{{ rp.name }}</td>
+                  <td style="padding:12px 20px;color:oklch(0.5 0.02 255);">{{ rp.type }}</td>
+                  <td style="padding:12px 20px;"><span style="{{ rp.badgeStyle }}">{{ rp.status }}</span></td>
+                  <td style="padding:12px 20px;text-align:right;font-weight:600;">{{ rp.value }}</td>
+                  <td style="padding:12px 20px;text-align:right;color:oklch(0.55 0.02 255);">{{ rp.updated }}</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isProjects }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+          <div style="font-size:22px;font-weight:700;">Projects</div>
+          <div onClick="{{ createNewProject }}" style="background:oklch(0.28 0.06 255);color:#fff;font-size:13.5px;font-weight:600;padding:10px 18px;border-radius:7px;cursor:pointer;">+ New Project</div>
+        </div>
+        <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;overflow:hidden;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:oklch(0.98 0.004 255);">
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Project</th>
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Owner</th>
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Location</th>
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Status</th>
+                <th style="text-align:right;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Est. Value</th>
+                <th style="text-align:right;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Revisions</th>
+                <th style="padding:10px 20px;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ projectsList }}" as="p" hint-placeholder-count="6">
+                <tr onClick="{{ p.open }}" style="{{ p.rowStyle }}">
+                  <td style="padding:12px 20px;font-weight:600;">{{ p.name }}{{ p.currentTag }}</td>
+                  <td style="padding:12px 20px;color:oklch(0.5 0.02 255);">{{ p.owner }}</td>
+                  <td style="padding:12px 20px;color:oklch(0.5 0.02 255);">{{ p.location }}</td>
+                  <td style="padding:12px 20px;"><span style="{{ p.badgeStyle }}">{{ p.status }}</span></td>
+                  <td style="padding:12px 20px;text-align:right;font-weight:600;">{{ p.value }}</td>
+                  <td style="padding:12px 20px;text-align:right;color:oklch(0.55 0.02 255);">{{ p.revisions }}</td>
+                  <td style="padding:12px 20px;text-align:right;"><span onClick="{{ p.remove }}" style="cursor:pointer;color:oklch(0.58 0.18 25);font-size:12px;font-weight:600;">Delete</span></td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="margin-top:14px;">
+          <div onClick="{{ toggleTrash }}" style="font-size:12.5px;font-weight:600;color:oklch(0.5 0.02 255);cursor:pointer;display:inline-block;">Trash / Deleted Projects ▾</div>
+          <sc-if value="{{ showTrash }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;margin-top:10px;overflow:hidden;">
+              <sc-for list="{{ trashedProjects }}" as="t" hint-placeholder-count="1">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-top:1px solid oklch(0.94 0.01 255);font-size:13px;">
+                  <div>{{ t.name }}</div>
+                  <span onClick="{{ t.restore }}" style="cursor:pointer;color:oklch(0.4 0.1 255);font-weight:600;font-size:12px;">Restore</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isEstimator }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <div style="margin-bottom:18px;">
+          <div style="font-size:22px;font-weight:700;">Material &amp; Labor Calculator</div>
+          <div style="font-size:13px;color:oklch(0.5 0.02 255);margin-top:3px;">Select a work item, enter dimensions, and review live quantities and cost.</div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
+          <sc-for list="{{ workTypeTabs }}" as="t" hint-placeholder-count="6">
+            <div onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</div>
+          </sc-for>
+        </div>
+
+        <div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,0.9fr);gap:20px;align-items:start;">
+
+          <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;padding:22px;">
+
+            <sc-if value="{{ isChb }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:14.5px;font-weight:700;margin-bottom:14px;">CHB Wall — Dimensions &amp; Specification</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                <div><label style="{{ labelStyle }}">Wall Length (m)</label><input type="number" placeholder="0.00" value="{{ f.length }}" onChange="{{ h.length }}" style="{{ inputStyle }}"/></div>
+                <div><label style="{{ labelStyle }}">Wall Height (m)</label><input type="number" placeholder="0.00" value="{{ f.height }}" onChange="{{ h.height }}" style="{{ inputStyle }}"/></div>
+              </div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">CHB Thickness</label>
+                <div style="display:flex;gap:8px;">
+                  <div onClick="{{ setThickness4 }}" style="{{ chbThickStyle4 }}">4 in</div>
+                  <div onClick="{{ setThickness6 }}" style="{{ chbThickStyle6 }}">6 in</div>
+                  <div onClick="{{ setThickness8 }}" style="{{ chbThickStyle8 }}">8 in</div>
+                </div>
+              </div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Total Opening Area to Deduct — doors/windows (sqm)</label><input type="number" placeholder="0.00" value="{{ f.openingsArea }}" onChange="{{ h.openingsArea }}" style="{{ inputStyle }}"/></div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Wastage Allowance (%)</label><input type="number" placeholder="5" value="{{ f.wastage }}" onChange="{{ h.wastage }}" style="{{ inputStyle }}"/></div>
+
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Editable Coefficients</div>
+                <div style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:oklch(0.55 0.02 255);background:oklch(0.98 0.004 255);padding:8px 10px;border-radius:6px;margin-bottom:12px;">Area = (L × H) − Openings &nbsp;·&nbsp; Qty = Area × Coefficient × (1 + Wastage)</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                  <div><label style="{{ labelStyle }}">Blocks / sqm</label><input type="number" value="{{ f.blockCoeff }}" onChange="{{ h.blockCoeff }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Cement bags / sqm</label><input type="number" value="{{ f.cementCoeff }}" onChange="{{ h.cementCoeff }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Sand cu.m / sqm</label><input type="number" value="{{ f.sandCoeff }}" onChange="{{ h.sandCoeff }}" style="{{ inputStyle }}"/></div>
+                </div>
+              </div>
+
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Material Prices</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                  <div><label style="{{ labelStyle }}">Block, ₱/pc</label><input type="number" placeholder="0.00" value="{{ f.blockPrice }}" onChange="{{ h.blockPrice }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Cement, ₱/bag</label><input type="number" placeholder="0.00" value="{{ f.cementPrice }}" onChange="{{ h.cementPrice }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Sand, ₱/cu.m</label><input type="number" placeholder="0.00" value="{{ f.sandPrice }}" onChange="{{ h.sandPrice }}" style="{{ inputStyle }}"/></div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isRebar }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:14.5px;font-weight:700;margin-bottom:14px;">Reinforcing Steel — Dimensions &amp; Specification</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                <div><label style="{{ labelStyle }}">Bar Diameter (mm)</label><input type="number" placeholder="10" value="{{ f.diameter }}" onChange="{{ h.diameter }}" style="{{ inputStyle }}"/></div>
+                <div><label style="{{ labelStyle }}">Total Cutting Length (lm)</label><input type="number" placeholder="0.00" value="{{ f.totalLength }}" onChange="{{ h.totalLength }}" style="{{ inputStyle }}"/></div>
+              </div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Wastage / Lap Allowance (%)</label><input type="number" placeholder="5" value="{{ f.wastage }}" onChange="{{ h.wastage }}" style="{{ inputStyle }}"/></div>
+
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Formula</div>
+                <div style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:oklch(0.55 0.02 255);background:oklch(0.98 0.004 255);padding:8px 10px;border-radius:6px;">Unit Weight (kg/m) = d² ÷ 162 &nbsp;·&nbsp; Total kg = Length × Unit Weight × (1 + Wastage)</div>
+              </div>
+
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Material Price</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                  <div><label style="{{ labelStyle }}">Steel, ₱/kg</label><input type="number" placeholder="0.00" value="{{ f.unitPriceKg }}" onChange="{{ h.unitPriceKg }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Pakyaw Rate Basis</label>
+                    <div style="display:flex;gap:8px;">
+                      <div onClick="{{ setRateUnitKg }}" style="{{ rateUnitStyleKg }}">per kg</div>
+                      <div onClick="{{ setRateUnitLm }}" style="{{ rateUnitStyleLm }}">per lm</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isConcrete }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:14.5px;font-weight:700;margin-bottom:14px;">Concrete — Dimensions &amp; Mix Class</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+                <div><label style="{{ labelStyle }}">Length (m)</label><input type="number" placeholder="0.00" value="{{ f.length }}" onChange="{{ h.length }}" style="{{ inputStyle }}"/></div>
+                <div><label style="{{ labelStyle }}">Width (m)</label><input type="number" placeholder="0.00" value="{{ f.width }}" onChange="{{ h.width }}" style="{{ inputStyle }}"/></div>
+                <div><label style="{{ labelStyle }}">Thickness (m)</label><input type="number" placeholder="0.00" value="{{ f.thickness }}" onChange="{{ h.thickness }}" style="{{ inputStyle }}"/></div>
+              </div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Mix Class</label>
+                <div style="display:flex;gap:8px;">
+                  <div onClick="{{ setClassA }}" style="{{ classStyleA }}">Class A (1:2:4)</div>
+                  <div onClick="{{ setClassB }}" style="{{ classStyleB }}">Class B (1:2.5:5)</div>
+                  <div onClick="{{ setClassC }}" style="{{ classStyleC }}">Class C (1:3:6)</div>
+                </div>
+              </div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Wastage Allowance (%)</label><input type="number" placeholder="5" value="{{ f.wastage }}" onChange="{{ h.wastage }}" style="{{ inputStyle }}"/></div>
+
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Editable Coefficients (per cu.m)</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                  <div><label style="{{ labelStyle }}">Cement, bags</label><input type="number" value="{{ f.cementCoeff }}" onChange="{{ h.cementCoeff }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Sand, cu.m</label><input type="number" value="{{ f.sandCoeff }}" onChange="{{ h.sandCoeff }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Gravel, cu.m</label><input type="number" value="{{ f.gravelCoeff }}" onChange="{{ h.gravelCoeff }}" style="{{ inputStyle }}"/></div>
+                </div>
+              </div>
+
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Material Prices</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                  <div><label style="{{ labelStyle }}">Cement, ₱/bag</label><input type="number" placeholder="0.00" value="{{ f.cementPrice }}" onChange="{{ h.cementPrice }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Sand, ₱/cu.m</label><input type="number" placeholder="0.00" value="{{ f.sandPrice }}" onChange="{{ h.sandPrice }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Gravel, ₱/cu.m</label><input type="number" placeholder="0.00" value="{{ f.gravelPrice }}" onChange="{{ h.gravelPrice }}" style="{{ inputStyle }}"/></div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isPlaster }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:14.5px;font-weight:700;margin-bottom:14px;">Plastering — Dimensions &amp; Specification</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                <div><label style="{{ labelStyle }}">Wall Length (m)</label><input type="number" placeholder="0.00" value="{{ f.length }}" onChange="{{ h.length }}" style="{{ inputStyle }}"/></div>
+                <div><label style="{{ labelStyle }}">Wall Height (m)</label><input type="number" placeholder="0.00" value="{{ f.height }}" onChange="{{ h.height }}" style="{{ inputStyle }}"/></div>
+              </div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Sides Plastered</label>
+                <div style="display:flex;gap:8px;">
+                  <div onClick="{{ setSides1 }}" style="{{ sidesStyle1 }}">One side</div>
+                  <div onClick="{{ setSides2 }}" style="{{ sidesStyle2 }}">Two sides</div>
+                </div>
+              </div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Wastage Allowance (%)</label><input type="number" placeholder="5" value="{{ f.wastage }}" onChange="{{ h.wastage }}" style="{{ inputStyle }}"/></div>
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Editable Coefficients (per sqm)</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                  <div><label style="{{ labelStyle }}">Cement, bags</label><input type="number" value="{{ f.cementCoeff }}" onChange="{{ h.cementCoeff }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Sand, cu.m</label><input type="number" value="{{ f.sandCoeff }}" onChange="{{ h.sandCoeff }}" style="{{ inputStyle }}"/></div>
+                </div>
+              </div>
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Material Prices</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                  <div><label style="{{ labelStyle }}">Cement, ₱/bag</label><input type="number" placeholder="0.00" value="{{ f.cementPrice }}" onChange="{{ h.cementPrice }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Sand, ₱/cu.m</label><input type="number" placeholder="0.00" value="{{ f.sandPrice }}" onChange="{{ h.sandPrice }}" style="{{ inputStyle }}"/></div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isGypsum }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:14.5px;font-weight:700;margin-bottom:14px;">Gypsum Ceiling / Partition — Specification</div>
+              <div style="margin-top:0;"><label style="{{ labelStyle }}">Installation Type</label>
+                <div style="display:flex;gap:8px;">
+                  <div onClick="{{ setTypeCeiling }}" style="{{ gypTypeStyleCeiling }}">Ceiling</div>
+                  <div onClick="{{ setTypePartition }}" style="{{ gypTypeStylePartition }}">Partition (double board)</div>
+                </div>
+              </div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Area (sqm)</label><input type="number" placeholder="0.00" value="{{ f.area }}" onChange="{{ h.area }}" style="{{ inputStyle }}"/></div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Wastage Allowance (%)</label><input type="number" placeholder="5" value="{{ f.wastage }}" onChange="{{ h.wastage }}" style="{{ inputStyle }}"/></div>
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Editable Coefficients (per sqm)</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                  <div><label style="{{ labelStyle }}">Boards, pcs</label><input type="number" value="{{ f.boardCoeff }}" onChange="{{ h.boardCoeff }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Metal furring, lm</label><input type="number" value="{{ f.furringCoeff }}" onChange="{{ h.furringCoeff }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Screws, pcs</label><input type="number" value="{{ f.screwCoeff }}" onChange="{{ h.screwCoeff }}" style="{{ inputStyle }}"/></div>
+                </div>
+              </div>
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Material Prices</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                  <div><label style="{{ labelStyle }}">Board, ₱/pc</label><input type="number" placeholder="0.00" value="{{ f.boardPrice }}" onChange="{{ h.boardPrice }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Furring, ₱/lm</label><input type="number" placeholder="0.00" value="{{ f.furringPrice }}" onChange="{{ h.furringPrice }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Screws, ₱/pc</label><input type="number" placeholder="0.00" value="{{ f.screwPrice }}" onChange="{{ h.screwPrice }}" style="{{ inputStyle }}"/></div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isPaint }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:14.5px;font-weight:700;margin-bottom:14px;">Painting — Walls / Ceiling / Steel</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                <div><label style="{{ labelStyle }}">Area to Paint (sqm)</label><input type="number" placeholder="0.00" value="{{ f.area }}" onChange="{{ h.area }}" style="{{ inputStyle }}"/></div>
+                <div><label style="{{ labelStyle }}">Number of Coats</label><input type="number" placeholder="2" value="{{ f.coats }}" onChange="{{ h.coats }}" style="{{ inputStyle }}"/></div>
+              </div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Primer Coat</label>
+                <div style="display:flex;gap:8px;">
+                  <div onClick="{{ setPrimerYes }}" style="{{ primerStyleYes }}">With primer</div>
+                  <div onClick="{{ setPrimerNo }}" style="{{ primerStyleNo }}">No primer</div>
+                </div>
+              </div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Wastage Allowance (%)</label><input type="number" placeholder="5" value="{{ f.wastage }}" onChange="{{ h.wastage }}" style="{{ inputStyle }}"/></div>
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Coverage &amp; Prices</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                  <div><label style="{{ labelStyle }}">Coverage, sqm/L</label><input type="number" value="{{ f.coverage }}" onChange="{{ h.coverage }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Paint, ₱/L</label><input type="number" placeholder="0.00" value="{{ f.paintPrice }}" onChange="{{ h.paintPrice }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Primer, ₱/L</label><input type="number" placeholder="0.00" value="{{ f.primerPrice }}" onChange="{{ h.primerPrice }}" style="{{ inputStyle }}"/></div>
+                </div>
+              </div>
+            </sc-if>
+
+            <div style="margin-top:22px;padding-top:18px;border-top:1px solid oklch(0.91 0.01 255);">
+              <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Pakyaw Labor Rate</div>
+              <div style="display:flex;gap:8px;margin-bottom:12px;">
+                <div onClick="{{ setModeLaborOnly }}" style="{{ modeStyleLaborOnly }}">Labor Only</div>
+                <div onClick="{{ setModeSupply }}" style="{{ modeStyleSupply }}">Supply &amp; Install</div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr;gap:12px;">
+                <div><label style="{{ labelStyle }}">Pakyaw Rate (₱ / {{ calc.unit }})</label><input type="number" placeholder="0.00" value="{{ f.pakyawRate }}" onChange="{{ h.pakyawRate }}" style="{{ inputStyle }}"/></div>
+              </div>
+              <sc-if value="{{ isSupplyMode }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:8px;font-size:11.5px;color:oklch(0.6 0.13 70);background:oklch(0.97 0.02 70);padding:7px 10px;border-radius:6px;">Supply &amp; Install selected — material cost is included in this rate and excluded below to avoid double-counting.</div>
+              </sc-if>
+            </div>
+          </div>
+
+          <div style="position:sticky;top:0;display:flex;flex-direction:column;gap:16px;">
+            <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;padding:20px;">
+              <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:12px;">Quantity Breakdown</div>
+              <sc-for list="{{ calc.rows }}" as="r" hint-placeholder-count="3">
+                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid oklch(0.95 0.01 255);font-size:13.5px;">
+                  <div style="color:oklch(0.4 0.02 255);">{{ r.label }}</div>
+                  <div style="font-weight:700;">{{ r.value }}</div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="background:oklch(0.19 0.035 255);border-radius:10px;padding:20px;color:#fff;">
+              <div style="font-size:12.5px;font-weight:700;color:oklch(0.75 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:14px;">Line Cost</div>
+              <div style="display:flex;justify-content:space-between;font-size:13.5px;padding:6px 0;">
+                <div style="color:oklch(0.78 0.02 255);">Material Cost</div><div style="font-weight:700;">{{ calc.materialCostFmt }}</div>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:13.5px;padding:6px 0;">
+                <div style="color:oklch(0.78 0.02 255);">Pakyaw Labor Cost</div><div style="font-weight:700;">{{ calc.laborCostFmt }}</div>
+              </div>
+              <div style="height:1px;background:oklch(0.35 0.03 255);margin:10px 0;"></div>
+              <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;">
+                <div>Line Total</div><div>{{ calc.lineTotalFmt }}</div>
+              </div>
+              <div onClick="{{ addToBoq }}" style="margin-top:16px;background:#fff;color:oklch(0.19 0.035 255);font-size:13.5px;font-weight:700;padding:11px;border-radius:7px;text-align:center;cursor:pointer;">Add to BOQ →</div>
+            </div>
+
+            <div style="background:oklch(0.97 0.015 155);border:1px solid oklch(0.88 0.03 155);border-radius:10px;padding:14px 16px;font-size:12.5px;color:oklch(0.35 0.06 155);">{{ boqCountNote }}</div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isBoq }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+          <div>
+            <div style="font-size:22px;font-weight:700;">Bill of Quantities</div>
+            <div style="font-size:13px;color:oklch(0.5 0.02 255);margin-top:3px;">Consolidated line items from the Estimator. Revise rates or remove items before exporting.</div>
+          </div>
+          <div onClick="{{ goReports }}" style="background:oklch(0.28 0.06 255);color:#fff;font-size:13.5px;font-weight:600;padding:10px 18px;border-radius:7px;cursor:pointer;">Export Quotation →</div>
+        </div>
+
+        <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;overflow:hidden;margin-bottom:20px;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:oklch(0.98 0.004 255);">
+                <th style="text-align:left;padding:10px 16px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Item</th>
+                <th style="text-align:right;padding:10px 16px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Qty</th>
+                <th style="text-align:left;padding:10px 16px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Mode</th>
+                <th style="text-align:right;padding:10px 16px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Material</th>
+                <th style="text-align:right;padding:10px 16px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Labor</th>
+                <th style="text-align:right;padding:10px 16px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Line Total</th>
+                <th style="padding:10px 16px;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ boqRows }}" as="row" hint-placeholder-count="3">
+                <tr style="border-top:1px solid oklch(0.94 0.01 255);">
+                  <td style="padding:12px 16px;font-weight:600;">{{ row.label }}</td>
+                  <td style="padding:12px 16px;text-align:right;color:oklch(0.5 0.02 255);">{{ row.qtyLabel }}</td>
+                  <td style="padding:12px 16px;"><span style="{{ row.modeBadge }}">{{ row.modeLabel }}</span></td>
+                  <td style="padding:12px 16px;text-align:right;">{{ row.materialFmt }}</td>
+                  <td style="padding:12px 16px;text-align:right;">{{ row.laborFmt }}</td>
+                  <td style="padding:12px 16px;text-align:right;font-weight:700;">{{ row.totalFmt }}</td>
+                  <td style="padding:12px 16px;text-align:right;"><span onClick="{{ row.remove }}" style="cursor:pointer;color:oklch(0.58 0.18 25);font-size:12px;font-weight:600;">Remove</span></td>
+                </tr>
+              </sc-for>
+              <sc-if value="{{ boqEmpty }}" hint-placeholder-val="{{ false }}">
+                <tr><td colspan="7" style="padding:30px;text-align:center;color:oklch(0.6 0.02 255);">No items yet. Go to the Estimator and add a calculated line item.</td></tr>
+              </sc-if>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,0.6fr);gap:20px;">
+          <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;padding:20px;">
+            <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:14px;">Additional Costs</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+              <div><label style="{{ labelStyle }}">Equipment, ₱</label><input type="number" placeholder="0.00" value="{{ summary.equipment }}" onChange="{{ h2.equipment }}" style="{{ inputStyle }}"/></div>
+              <div><label style="{{ labelStyle }}">Delivery, ₱</label><input type="number" placeholder="0.00" value="{{ summary.delivery }}" onChange="{{ h2.delivery }}" style="{{ inputStyle }}"/></div>
+              <div><label style="{{ labelStyle }}">Overhead, %</label><input type="number" value="{{ summary.overheadPct }}" onChange="{{ h2.overheadPct }}" style="{{ inputStyle }}"/></div>
+              <div><label style="{{ labelStyle }}">Contingency, %</label><input type="number" value="{{ summary.contingencyPct }}" onChange="{{ h2.contingencyPct }}" style="{{ inputStyle }}"/></div>
+              <div><label style="{{ labelStyle }}">Profit, %</label><input type="number" value="{{ summary.profitPct }}" onChange="{{ h2.profitPct }}" style="{{ inputStyle }}"/></div>
+              <div>
+                <label style="{{ labelStyle }}">VAT / Tax</label>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div onClick="{{ toggleTax }}" style="{{ taxToggleStyle }}"><div style="{{ taxKnobStyle }}"></div></div>
+                  <input type="number" value="{{ summary.taxPct }}" onChange="{{ h2.taxPct }}" style="{{ inputStyleSmall }}"/><span style="font-size:12.5px;color:oklch(0.5 0.02 255);">%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="background:oklch(0.19 0.035 255);border-radius:10px;padding:22px;color:#fff;">
+            <div style="font-size:12.5px;font-weight:700;color:oklch(0.75 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:14px;">Cost Summary</div>
+            <sc-for list="{{ summaryRows }}" as="s" hint-placeholder-count="7">
+              <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;">
+                <div style="color:oklch(0.78 0.02 255);">{{ s.label }}</div><div style="font-weight:600;">{{ s.value }}</div>
+              </div>
+            </sc-for>
+            <div style="height:1px;background:oklch(0.35 0.03 255);margin:12px 0;"></div>
+            <div style="display:flex;justify-content:space-between;font-size:19px;font-weight:700;">
+              <div>Grand Total</div><div>{{ grandTotalFmt }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isLibrary }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <div style="margin-bottom:18px;">
+          <div style="font-size:22px;font-weight:700;">Cost Library</div>
+          <div style="font-size:13px;color:oklch(0.5 0.02 255);margin-top:3px;">Set material unit prices and pakyaw labor rates. All values start blank — fill in your current market rates.</div>
+        </div>
+
+        <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;overflow:hidden;margin-bottom:20px;">
+          <div style="padding:14px 20px;border-bottom:1px solid oklch(0.93 0.01 255);font-size:14px;font-weight:700;">Material Prices</div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:oklch(0.98 0.004 255);">
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Material</th>
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Unit</th>
+                <th style="text-align:right;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Unit Price (₱)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ libMaterials }}" as="m" hint-placeholder-count="8">
+                <tr style="border-top:1px solid oklch(0.94 0.01 255);">
+                  <td style="padding:10px 20px;font-weight:600;">{{ m.name }}</td>
+                  <td style="padding:10px 20px;color:oklch(0.5 0.02 255);">{{ m.unit }}</td>
+                  <td style="padding:8px 20px;text-align:right;"><input type="number" placeholder="0.00" value="{{ m.price }}" onChange="{{ m.onChange }}" style="{{ inputStyleRight }}"/></td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;overflow:hidden;">
+          <div style="padding:14px 20px;border-bottom:1px solid oklch(0.93 0.01 255);font-size:14px;font-weight:700;">Pakyaw Labor Rates</div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:oklch(0.98 0.004 255);">
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Scope of Work</th>
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Unit</th>
+                <th style="text-align:right;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Labor Only (₱)</th>
+                <th style="text-align:right;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Supply &amp; Install (₱)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ libLabor }}" as="l" hint-placeholder-count="8">
+                <tr style="border-top:1px solid oklch(0.94 0.01 255);">
+                  <td style="padding:10px 20px;font-weight:600;">{{ l.name }}</td>
+                  <td style="padding:10px 20px;color:oklch(0.5 0.02 255);">{{ l.unit }}</td>
+                  <td style="padding:8px 20px;text-align:right;"><input type="number" placeholder="0.00" value="{{ l.laborOnly }}" onChange="{{ l.onChangeLO }}" style="{{ inputStyleRight }}"/></td>
+                  <td style="padding:8px 20px;text-align:right;"><input type="number" placeholder="0.00" value="{{ l.supplyInstall }}" onChange="{{ l.onChangeSI }}" style="{{ inputStyleRight }}"/></td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isReports }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <div style="margin-bottom:18px;">
+          <div style="font-size:22px;font-weight:700;">Reports &amp; Quotation Export</div>
+          <div style="font-size:13px;color:oklch(0.5 0.02 255);margin-top:3px;">Preview the client-facing quotation document and configure export settings.</div>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,0.55fr);gap:20px;align-items:start;">
+
+          <div style="background:#fff;border:1px solid oklch(0.89 0.01 255);border-radius:10px;box-shadow:0 1px 3px oklch(0 0 0 / 0.06);padding:40px;min-height:560px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid oklch(0.19 0.035 255);padding-bottom:18px;margin-bottom:18px;">
+              <div>
+                <div style="font-size:18px;font-weight:700;color:oklch(0.19 0.035 255);">{{ company.name }}</div>
+                <div style="font-size:11.5px;color:oklch(0.55 0.02 255);margin-top:4px;">{{ company.address }}</div>
+                <div style="font-size:11.5px;color:oklch(0.55 0.02 255);">{{ company.contact }}</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:15px;font-weight:700;letter-spacing:0.5px;">QUOTATION</div>
+                <div style="font-size:11px;color:oklch(0.55 0.02 255);margin-top:3px;">No. Q-2026-0142</div>
+                <div style="font-size:11px;color:oklch(0.55 0.02 255);">Date: Oct 20, 2026</div>
+              </div>
+            </div>
+            <div style="font-size:12px;color:oklch(0.5 0.02 255);margin-bottom:16px;">Prepared for: <strong style="color:oklch(0.22 0.015 255);">Client Name, Project Address</strong></div>
+            <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;">
+              <thead><tr style="border-bottom:1px solid oklch(0.85 0.01 255);"><th style="text-align:left;padding:6px 0;color:oklch(0.5 0.02 255);">Item</th><th style="text-align:right;padding:6px 0;color:oklch(0.5 0.02 255);">Qty</th><th style="text-align:right;padding:6px 0;color:oklch(0.5 0.02 255);">Amount</th></tr></thead>
+              <tbody>
+                <sc-for list="{{ boqRows }}" as="row" hint-placeholder-count="2">
+                  <tr style="border-bottom:1px solid oklch(0.94 0.01 255);"><td style="padding:7px 0;">{{ row.label }}</td><td style="text-align:right;padding:7px 0;">{{ row.qtyLabel }}</td><td style="text-align:right;padding:7px 0;">{{ row.totalFmt }}</td></tr>
+                </sc-for>
+              </tbody>
+            </table>
+            <div style="display:flex;justify-content:flex-end;margin-bottom:28px;">
+              <div style="width:230px;">
+                <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;padding-top:8px;border-top:2px solid oklch(0.19 0.035 255);"><div>Grand Total</div><div>{{ grandTotalFmt }}</div></div>
+              </div>
+            </div>
+            <div style="font-size:11px;color:oklch(0.5 0.02 255);line-height:1.6;margin-bottom:30px;">{{ reportSettings.terms }}</div>
+            <sc-if value="{{ reportSettings.includeSignature }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;justify-content:space-between;margin-top:30px;">
+                <div style="width:40%;"><div style="border-top:1px solid oklch(0.6 0.02 255);padding-top:6px;font-size:11px;color:oklch(0.5 0.02 255);">Prepared by / QS</div></div>
+                <div style="width:40%;"><div style="border-top:1px solid oklch(0.6 0.02 255);padding-top:6px;font-size:11px;color:oklch(0.5 0.02 255);">Conforme / Client</div></div>
+              </div>
+            </sc-if>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;padding:18px;">
+              <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:12px;">Letterhead</div>
+              <label style="{{ labelStyle }}">Company Name</label><input value="{{ company.name }}" onChange="{{ h3.companyName }}" style="{{ inputStyle }}"/>
+              <label style="{{ labelStyle }}margin-top:10px;display:block;">Address</label><input value="{{ company.address }}" onChange="{{ h3.companyAddress }}" style="{{ inputStyle }}"/>
+              <label style="{{ labelStyle }}margin-top:10px;display:block;">Contact Info</label><input value="{{ company.contact }}" onChange="{{ h3.companyContact }}" style="{{ inputStyle }}"/>
+            </div>
+            <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;padding:18px;">
+              <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:12px;">Export Settings</div>
+              <label style="{{ labelStyle }}">Terms &amp; Notes</label>
+              <textarea onChange="{{ h3.terms }}" style="width:100%;box-sizing:border-box;min-height:70px;border:1px solid oklch(0.85 0.01 255);border-radius:7px;padding:9px 11px;font-size:13px;resize:vertical;">{{ reportSettings.terms }}</textarea>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;">
+                <label style="{{ labelStyle }}margin:0;">Include Signature Block</label>
+                <div onClick="{{ toggleSignature }}" style="{{ sigToggleStyle }}"><div style="{{ sigKnobStyle }}"></div></div>
+              </div>
+              <label style="{{ labelStyle }}margin-top:12px;display:block;">Export Format</label>
+              <div style="display:flex;gap:8px;">
+                <div onClick="{{ setFormatPdf }}" style="{{ formatStylePdf }}">PDF</div>
+                <div onClick="{{ setFormatXls }}" style="{{ formatStyleXls }}">Excel</div>
+              </div>
+            </div>
+            <div onClick="{{ exportReport }}" style="background:oklch(0.28 0.06 255);color:#fff;font-size:13.5px;font-weight:700;padding:12px;border-radius:8px;text-align:center;cursor:pointer;">Download {{ reportSettings.formatLabel }}</div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <div style="margin-bottom:18px;">
+          <div style="font-size:22px;font-weight:700;">Settings</div>
+          <div style="font-size:13px;color:oklch(0.5 0.02 255);margin-top:3px;">Company profile and Google Sheets backup &amp; sync.</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:minmax(0,0.9fr) minmax(0,1.1fr);gap:20px;align-items:start;">
+          <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;padding:20px;">
+            <div style="font-size:14px;font-weight:700;margin-bottom:14px;">Company Profile</div>
+            <label style="{{ labelStyle }}">Company Name</label><input value="{{ company.name }}" onChange="{{ h3.companyName }}" style="{{ inputStyle }}"/>
+            <label style="{{ labelStyle }}margin-top:10px;display:block;">Address</label><input value="{{ company.address }}" onChange="{{ h3.companyAddress }}" style="{{ inputStyle }}"/>
+            <label style="{{ labelStyle }}margin-top:10px;display:block;">Contact</label><input value="{{ company.contact }}" onChange="{{ h3.companyContact }}" style="{{ inputStyle }}"/>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;padding:20px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                <div style="font-size:14px;font-weight:700;">Google Sheets Backup</div>
+                <span style="{{ sheetsStatusBadge }}">{{ sheetsStatusLabel }}</span>
+              </div>
+              <div style="font-size:12.5px;color:oklch(0.5 0.02 255);margin-bottom:14px;">Project data, BOQ, prices and cost summaries sync to a Google Sheet via an Apps Script Web App. See backend/DEPLOYMENT.md for setup.</div>
+              <label style="{{ labelStyle }}">Apps Script Web App URL</label>
+              <input placeholder="https://script.google.com/macros/s/…/exec" value="{{ backend.scriptUrl }}" onChange="{{ h4.scriptUrl }}" style="{{ inputStyle }}"/>
+              <label style="{{ labelStyle }}margin-top:10px;display:block;">API Token</label>
+              <input placeholder="shared secret from Script Properties" value="{{ backend.apiToken }}" onChange="{{ h4.apiToken }}" style="{{ inputStyle }}"/>
+              <div style="display:flex;gap:8px;margin-top:12px;">
+                <div onClick="{{ connectSheets }}" style="flex:1;background:oklch(0.28 0.06 255);color:#fff;font-size:13px;font-weight:700;padding:10px;border-radius:7px;text-align:center;cursor:pointer;">{{ sheetsConnectLabel }}</div>
+                <div onClick="{{ syncNow }}" style="flex:1;background:#fff;border:1px solid oklch(0.85 0.01 255);color:oklch(0.3 0.02 255);font-size:13px;font-weight:700;padding:10px;border-radius:7px;text-align:center;cursor:pointer;">Sync Now</div>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:8px;">
+                <div onClick="{{ migrateLocalData }}" style="flex:1;background:#fff;border:1px solid oklch(0.85 0.01 255);color:oklch(0.3 0.02 255);font-size:12.5px;font-weight:600;padding:9px;border-radius:7px;text-align:center;cursor:pointer;">Migrate Local Data</div>
+                <div onClick="{{ runHealthCheck }}" style="flex:1;background:#fff;border:1px solid oklch(0.85 0.01 255);color:oklch(0.3 0.02 255);font-size:12.5px;font-weight:600;padding:9px;border-radius:7px;text-align:center;cursor:pointer;">Run Health Check</div>
+              </div>
+              <sc-if value="{{ dbHealth }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:10px;background:oklch(0.98 0.004 255);border-radius:7px;padding:10px 12px;">
+                  <sc-for list="{{ dbHealthRows }}" as="row" hint-placeholder-count="4">
+                    <div style="display:flex;justify-content:space-between;font-size:11.5px;color:oklch(0.5 0.02 255);padding:2px 0;"><div>{{ row.name }}</div><div style="font-weight:700;color:oklch(0.3 0.02 255);">{{ row.count }} rows</div></div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <div style="margin-top:18px;padding-top:16px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Field Mapping</div>
+                <sc-for list="{{ sheetMapping }}" as="m" hint-placeholder-count="4">
+                  <div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;padding:7px 0;border-bottom:1px solid oklch(0.95 0.01 255);">
+                    <div style="color:oklch(0.4 0.02 255);">{{ m.app }}</div>
+                    <div style="color:oklch(0.65 0.01 255);">→</div>
+                    <div style="font-family:ui-monospace,Menlo,monospace;">{{ m.sheet }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;padding:20px;">
+              <div style="font-size:14px;font-weight:700;margin-bottom:12px;">Sync Log</div>
+              <sc-for list="{{ syncLog }}" as="entry" hint-placeholder-count="3">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid oklch(0.95 0.01 255);font-size:12.5px;">
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="width:6px;height:6px;border-radius:50%;background:{{ entry.dotColor }};"></div>
+                    <div>{{ entry.text }}</div>
+                  </div>
+                  <div style="color:oklch(0.55 0.02 255);">{{ entry.time }}</div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;padding:20px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                <div style="font-size:14px;font-weight:700;">Revisions — {{ currentProjectName }}</div>
+                <div onClick="{{ saveRevision }}" style="font-size:12px;font-weight:700;color:oklch(0.28 0.06 255);cursor:pointer;">+ Save Revision</div>
+              </div>
+              <sc-for list="{{ revisionsList }}" as="rev" hint-placeholder-count="2">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid oklch(0.95 0.01 255);font-size:12.5px;">
+                  <div>
+                    <div style="font-weight:600;">{{ rev.label }}</div>
+                    <div style="color:oklch(0.55 0.02 255);font-size:11.5px;">{{ rev.timestamp }}</div>
+                  </div>
+                  <span onClick="{{ rev.restore }}" style="cursor:pointer;color:oklch(0.4 0.1 255);font-size:12px;font-weight:600;">Restore</span>
+                </div>
+              </sc-for>
+              <sc-if value="{{ revisionsEmpty }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:14px 0;color:oklch(0.6 0.02 255);font-size:12.5px;">No saved revisions yet — click "Save Revision" to snapshot the current BOQ.</div>
+              </sc-if>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    screen: 'dashboard',
+    workType: 'chb',
+    chb: { length:'', height:'', thickness:'6', openingsArea:'', wastage:'5', blockCoeff:'12.5', cementCoeff:'0.12', sandCoeff:'0.013', blockPrice:'', cementPrice:'', sandPrice:'', mode:'laborOnly', pakyawRate:'' },
+    rebar: { diameter:'10', totalLength:'', wastage:'5', unitPriceKg:'', rateUnit:'kg', mode:'laborOnly', pakyawRate:'' },
+    concrete: { length:'', width:'', thickness:'', mixClass:'A', wastage:'5', cementCoeff:'9.0', sandCoeff:'0.5', gravelCoeff:'1.0', cementPrice:'', sandPrice:'', gravelPrice:'', mode:'laborOnly', pakyawRate:'' },
+    plaster: { length:'', height:'', sides:'1', wastage:'5', cementCoeff:'0.09', sandCoeff:'0.018', cementPrice:'', sandPrice:'', mode:'laborOnly', pakyawRate:'' },
+    gypsum: { type:'ceiling', area:'', wastage:'5', boardCoeff:'0.36', furringCoeff:'2.0', screwCoeff:'30', boardPrice:'', furringPrice:'', screwPrice:'', mode:'laborOnly', pakyawRate:'' },
+    paint: { area:'', coats:'2', primer:'yes', wastage:'5', coverage:'10', paintPrice:'', primerPrice:'', mode:'laborOnly', pakyawRate:'' },
+    boq: [],
+    boqSeq: 1,
+    currentProjectId: 'p1',
+    projects: [
+      {id:'p1', name:'Two-Storey Residence', type:'Residential', status:'In Progress', value:1842500, updated:'2 hours ago', owner:'J. Santos', location:'Quezon City', revisions:2},
+      {id:'p2', name:'Retail Fit-out, Unit 4B', type:'Commercial', status:'For Review', value:615200, updated:'Yesterday', owner:'J. Santos', location:'Makati', revisions:1},
+      {id:'p3', name:'Perimeter Fence & Gate', type:'Residential', status:'Draft', value:98400, updated:'3 days ago', owner:'J. Santos', location:'Antipolo', revisions:0},
+      {id:'p4', name:'Warehouse Extension', type:'Industrial', status:'Approved', value:3210000, updated:'1 week ago', owner:'J. Santos', location:'Cavite', revisions:3},
+      {id:'p5', name:'School Classroom Bldg.', type:'Institutional', status:'In Progress', value:4120750, updated:'1 week ago', owner:'J. Santos', location:'Laguna', revisions:1},
+    ],
+    revisions: [],
+    syncStatus: 'saved', lastSyncAt: null, pendingChanges: false, projectVersion: 1, conflictInfo: null,
+    backend: { scriptUrl:'', apiToken:'', connected:false },
+    syncLogEntries: [], dbHealth: null, trashedProjects: [], showTrash: false,
+    summary: { equipment:'', delivery:'', overheadPct:'10', contingencyPct:'5', profitPct:'15', taxEnabled:false, taxPct:'12' },
+    company: { name:'ABC Builders & Construction Services', address:'123 Mabini St., Quezon City, Metro Manila', contact:'(02) 8123-4567 · abc@email.com' },
+    reportSettings: { terms:'Prices valid for 30 days. 50% downpayment upon approval, balance upon completion. Material price fluctuations beyond quotation validity may affect final cost.', includeSignature: true, format:'pdf' },
+    libMaterials: [
+      {name:'Portland Cement, 40kg', unit:'bag', price:''},
+      {name:'Washed Sand', unit:'cu.m', price:''},
+      {name:'Gravel (3/4")', unit:'cu.m', price:''},
+      {name:'CHB, 4 in', unit:'pc', price:''},
+      {name:'CHB, 6 in', unit:'pc', price:''},
+      {name:'Rebar, 10mm x 6m', unit:'pc', price:''},
+      {name:'Gypsum Board, 1/2in', unit:'pc', price:''},
+      {name:'Latex Paint', unit:'liter', price:''},
+    ],
+    libLabor: [
+      {name:'CHB Laying, 4"/6"', unit:'sqm', laborOnly:'', supplyInstall:''},
+      {name:'Rebar Fabrication & Install', unit:'kg', laborOnly:'', supplyInstall:''},
+      {name:'Concrete Pouring', unit:'cu.m', laborOnly:'', supplyInstall:''},
+      {name:'Plastering', unit:'sqm', laborOnly:'', supplyInstall:''},
+      {name:'Gypsum Ceiling Install', unit:'sqm', laborOnly:'', supplyInstall:''},
+      {name:'Painting, 2 coats', unit:'sqm', laborOnly:'', supplyInstall:''},
+    ],
+  };
+
+  n(v){ const x = parseFloat(v); return isNaN(x) ? 0 : x; }
+  peso(v){ return '₱' + this.n(v).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+  updateForm(type, field, value){ this.setState(s => ({ [type]: { ...s[type], [field]: value } })); }
+  makeHandler(type, field){ return (e) => this.updateForm(type, field, e.target.value); }
+
+  dataSignature(s){
+    return JSON.stringify({ pid: s.currentProjectId, chb:s.chb, rebar:s.rebar, concrete:s.concrete, plaster:s.plaster, gypsum:s.gypsum, paint:s.paint,
+      boq:s.boq, summary:s.summary, company:s.company, reportSettings:s.reportSettings, libMaterials:s.libMaterials, libLabor:s.libLabor });
+  }
+
+  componentDidMount(){
+    this._lastSig = this.dataSignature(this.state);
+    try {
+      const savedBackend = localStorage.getItem('qb_backend');
+      if (savedBackend) this.setState({ backend: JSON.parse(savedBackend) });
+      const cached = localStorage.getItem('qb_project_' + this.state.currentProjectId);
+      if (cached) { const parsed = JSON.parse(cached); this.setState(parsed); this.appendLog('Loaded local offline copy', 'ok'); }
+    } catch (e) {}
+    window.addEventListener('online', () => { if (this.state.pendingChanges) this.performSync(); else this.setState({syncStatus:'saved'}); });
+    window.addEventListener('offline', () => this.setState({syncStatus:'offline'}));
+    if (!navigator.onLine) this.setState({syncStatus:'offline'});
+    setTimeout(() => { if (this.state.backend.scriptUrl && this.state.backend.apiToken) this.testConnection(); }, 100);
+  }
+
+  toServerProject(){
+    const S = this.state;
+    return {
+      name: (S.projects.find(p=>p.id===S.currentProjectId)||{}).name || 'Untitled Project',
+      owner: S.company.name, location:'', type:'', status:'In Progress',
+      materials: S.libMaterials.map((m,i)=>({id:'m'+i, name:m.name, unit:m.unit, price:this.n(m.price)})),
+      laborRates: S.libLabor.map((l,i)=>({id:'l'+i, name:l.name, unit:l.unit, laborOnly:this.n(l.laborOnly), supplyInstall:this.n(l.supplyInstall)})),
+      boq: S.boq.map(b=>({id:'b'+b.id, label:b.label, qtyLabel:b.qtyLabel, materialCost:b.materialCost, laborCost:b.laborCost, mode:b.mode})),
+      summary: S.summary, estimates: [], grandTotal: 0,
+    };
+  }
+
+  fromServerBundle(bundle){
+    const materials = bundle.materials || [];
+    const laborRates = bundle.laborRates || [];
+    const boq = (bundle.boq || []).map((b,i)=>({ id:i+1, workType:'', label:b.Label, qtyLabel:b.Qty, materialCost:this.n(b.MaterialCost), laborCost:this.n(b.LaborCost), mode:b.Mode }));
+    const s = bundle.summary;
+    return {
+      libMaterials: materials.length ? materials.map(m=>({name:m.Name, unit:m.Unit, price: m.Price ? String(m.Price) : ''})) : this.state.libMaterials,
+      libLabor: laborRates.length ? laborRates.map(l=>({name:l.ScopeOfWork, unit:l.Unit, laborOnly: l.LaborOnlyRate ? String(l.LaborOnlyRate) : '', supplyInstall: l.SupplyInstallRate ? String(l.SupplyInstallRate) : ''})) : this.state.libLabor,
+      boq, boqSeq: boq.length + 1,
+      summary: s ? { equipment:String(s.Equipment||''), delivery:String(s.Delivery||''), overheadPct:String(s.OverheadPct||'10'), contingencyPct:String(s.ContingencyPct||'5'), profitPct:String(s.ProfitPct||'15'), taxEnabled:!!s.TaxEnabled, taxPct:String(s.TaxPct||'12') } : this.state.summary,
+      projectVersion: Number(bundle.project.Version || 1),
+      revisions: (bundle.revisions||[]).map(r=>({ id:r.RevisionID, label:r.Label, timestamp:r.CreatedAt, snapshot:null })),
+    };
+  }
+
+  componentDidUpdate(){
+    const sig = this.dataSignature(this.state);
+    if (sig !== this._lastSig) {
+      this._lastSig = sig;
+      try { localStorage.setItem('qb_project_' + this.state.currentProjectId, sig); } catch (e) {}
+      this.setState({ syncStatus: 'saving', pendingChanges: true });
+      clearTimeout(this._syncTimer);
+      this._syncTimer = setTimeout(() => this.performSync(), 1200);
+    }
+  }
+
+  appendLog(text, status){
+    const dot = status === 'error' ? 'oklch(0.58 0.18 25)' : status === 'warn' ? 'oklch(0.7 0.14 70)' : 'oklch(0.6 0.13 155)';
+    this.setState(s => ({ syncLogEntries: [{ text, time: new Date().toLocaleTimeString(), dotColor: dot }, ...s.syncLogEntries].slice(0, 20) }));
+  }
+
+  clientId_(){ return 'web-' + (this._clientId || (this._clientId = Math.random().toString(36).slice(2))); }
+
+  performSync(){
+    clearTimeout(this._syncTimer);
+    if (!navigator.onLine) { this.setState({syncStatus:'offline'}); return; }
+    if (!this.state.backend.scriptUrl || !this.state.backend.connected) { this.setState({syncStatus:'offline'}); this.appendLog('No connected backend — working offline', 'warn'); return; }
+    this.setState({syncStatus:'saving'});
+    const S = this.state;
+    const payload = {
+      action: 'update_project', token: S.backend.apiToken, clientId: this.clientId_(),
+      projectId: S.currentProjectId, expectedVersion: S.projectVersion,
+      project: this.toServerProject(),
+    };
+    fetch(S.backend.scriptUrl, { method:'POST', body: JSON.stringify(payload) })
+      .then(r => r.json())
+      .then(res => {
+        if (res.ok) {
+          this.setState({ syncStatus:'saved', pendingChanges:false, lastSyncAt:new Date(), projectVersion: res.version, conflictInfo:null });
+          this.appendLog('Saved v' + res.version + ' to Google Sheets', 'ok');
+        } else if (res.conflict) {
+          this.setState({ syncStatus:'conflict', conflictInfo: res });
+          this.appendLog('Conflict: ' + res.message, 'error');
+        } else {
+          this.setState({syncStatus:'error'}); this.appendLog('Sync failed: ' + (res.error || 'unknown error'), 'error');
+        }
+      })
+      .catch(err => { this.setState({syncStatus:'error'}); this.appendLog('Sync failed: ' + err, 'error'); });
+  }
+
+  syncNow(){ this.performSync(); }
+
+  reloadLatest(){
+    this.loadProject(this.state.currentProjectId);
+    this.setState({conflictInfo:null, syncStatus:'saved'});
+  }
+
+  testConnection(){
+    const url = this.state.backend.scriptUrl;
+    if (!url) { this.appendLog('Enter a Web App URL first', 'warn'); return; }
+    try { localStorage.setItem('qb_backend', JSON.stringify(this.state.backend)); } catch(e) {}
+    fetch(url + '?action=ping').then(r=>r.json()).then(res => {
+      if (res.ok) {
+        this.setState(s=>({backend:{...s.backend, connected:true}}));
+        this.appendLog('Connected to Google Sheets backend', 'ok');
+        this.refreshProjectList();
+      } else { this.appendLog('Connection failed: ' + (res.error||''), 'error'); }
+    }).catch(err => this.appendLog('Connection failed: ' + err, 'error'));
+  }
+
+  refreshProjectList(){
+    const { scriptUrl, apiToken } = this.state.backend;
+    fetch(scriptUrl + '?action=list_projects&token=' + encodeURIComponent(apiToken)).then(r=>r.json()).then(res => {
+      if (res.ok && res.projects.length) {
+        this.setState({ projects: res.projects.map(p => ({ id:p.ProjectID, name:p.ProjectName, type:p.BuildingType||'—', status:p.Status||'Draft', value:Number(p.Value)||0, updated:p.UpdatedAt, owner:p.Owner||'—', location:p.Location||'—', revisions:0 })) });
+        this.appendLog('Loaded ' + res.projects.length + ' project(s) from Sheets', 'ok');
+      }
+    }).catch(err => this.appendLog('Could not load project list: ' + err, 'error'));
+  }
+
+  loadProject(id){
+    this.setState({ currentProjectId: id, boq: [], screen: 'estimator' });
+    const { scriptUrl, apiToken, connected } = this.state.backend;
+    if (connected) {
+      fetch(scriptUrl + '?action=get_project&projectId=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(apiToken))
+        .then(r => r.json())
+        .then(res => {
+          if (res.ok) { this.setState(this.fromServerBundle(res)); this.appendLog('Loaded project from Google Sheets', 'ok'); }
+          else this.appendLog('Load failed: ' + res.error, 'error');
+        }).catch(err => this.appendLog('Load failed: ' + err, 'error'));
+    } else {
+      try { const cached = localStorage.getItem('qb_project_' + id); if (cached) this.setState(JSON.parse(cached)); } catch (e) {}
+      this.appendLog('Opened project (offline copy)', 'ok');
+    }
+  }
+
+  createNewProject(){
+    const { scriptUrl, apiToken, connected } = this.state.backend;
+    const localId = 'p' + Date.now();
+    const baseProject = { id: localId, name:'Untitled Project', type:'Residential', status:'Draft', value:0, updated:'Just now', owner: this.state.company.name, location:'', revisions:0 };
+    this.setState(s => ({ projects: [baseProject, ...s.projects], currentProjectId: localId, boq: [], revisions: [], projectVersion: 1, screen: 'estimator' }));
+    if (connected) {
+      fetch(scriptUrl, { method:'POST', body: JSON.stringify({ action:'create_project', token: apiToken, clientId: this.clientId_(), project: { name:'Untitled Project', clientGeneratedId: localId } }) })
+        .then(r=>r.json()).then(res => { if (res.ok) this.appendLog('Created project in Google Sheets', 'ok'); else this.appendLog('Create failed: ' + res.error, 'error'); })
+        .catch(err => this.appendLog('Create failed: ' + err, 'error'));
+    } else {
+      this.appendLog('Created project locally (will sync once connected)', 'warn');
+    }
+  }
+
+  deleteProject(id, name){
+    if (!window.confirm('Delete "' + name + '"? It can be restored from Trash afterward.')) return;
+    const { scriptUrl, apiToken, connected } = this.state.backend;
+    this.setState(s => ({ projects: s.projects.filter(p => p.id !== id) }));
+    if (connected) {
+      fetch(scriptUrl, { method:'POST', body: JSON.stringify({ action:'delete_project', token: apiToken, clientId: this.clientId_(), projectId: id }) })
+        .then(r=>r.json()).then(res => { if (res.ok) { this.appendLog('Project moved to Trash', 'ok'); this.fetchTrash(); } else this.appendLog('Delete failed: ' + res.error, 'error'); })
+        .catch(err => this.appendLog('Delete failed: ' + err, 'error'));
+    } else {
+      this.appendLog('Deleted locally — connect to Sheets to sync the deletion', 'warn');
+    }
+  }
+
+  fetchTrash(){
+    const { scriptUrl, apiToken, connected } = this.state.backend;
+    if (!connected) return;
+    fetch(scriptUrl + '?action=list_projects&includeDeleted=true&token=' + encodeURIComponent(apiToken)).then(r=>r.json()).then(res => {
+      if (res.ok) this.setState({ trashedProjects: res.projects.filter(p => p.IsDeleted === true || p.IsDeleted === 'TRUE').map(p => ({ id:p.ProjectID, name:p.ProjectName })) });
+    }).catch(()=>{});
+  }
+
+  restoreProjectFromTrash(id){
+    const { scriptUrl, apiToken } = this.state.backend;
+    fetch(scriptUrl, { method:'POST', body: JSON.stringify({ action:'restore_project', token: apiToken, clientId: this.clientId_(), projectId: id }) })
+      .then(r=>r.json()).then(res => {
+        if (res.ok) { this.appendLog('Project restored', 'ok'); this.fetchTrash(); this.refreshProjectList(); }
+        else this.appendLog('Restore failed: ' + res.error, 'error');
+      }).catch(err => this.appendLog('Restore failed: ' + err, 'error'));
+  }
+
+  migrateLocalData(){
+    const { scriptUrl, apiToken, connected } = this.state.backend;
+    if (!connected) { this.appendLog('Connect to Google Sheets before migrating', 'warn'); return; }
+    const entries = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.indexOf('qb_project_') === 0) {
+        try {
+          const data = JSON.parse(localStorage.getItem(key));
+          entries.push({ clientGeneratedId: key.replace('qb_project_',''), project: {
+            name: 'Migrated Project (' + key.replace('qb_project_','') + ')',
+            materials: (data.libMaterials||[]).map((m,i)=>({id:'m'+i, name:m.name, unit:m.unit, price:this.n(m.price)})),
+            laborRates: (data.libLabor||[]).map((l,i)=>({id:'l'+i, name:l.name, unit:l.unit, laborOnly:this.n(l.laborOnly), supplyInstall:this.n(l.supplyInstall)})),
+            boq: (data.boq||[]).map(b=>({id:'b'+b.id, label:b.label, qtyLabel:b.qtyLabel, materialCost:b.materialCost, laborCost:b.laborCost, mode:b.mode})),
+            summary: data.summary || this.state.summary, estimates: [], grandTotal: 0,
+          }});
+        } catch (e) {}
+      }
+    }
+    if (!entries.length) { this.appendLog('No local offline projects found to migrate', 'warn'); return; }
+    fetch(scriptUrl, { method:'POST', body: JSON.stringify({ action:'migrate_push', token: apiToken, clientId: this.clientId_(), localProjects: entries }) })
+      .then(r=>r.json()).then(res => {
+        if (res.ok) { this.appendLog('Migration: ' + res.results.map(r=>r.status).join(', '), 'ok'); this.refreshProjectList(); }
+        else this.appendLog('Migration failed: ' + res.error, 'error');
+      }).catch(err => this.appendLog('Migration failed: ' + err, 'error'));
+  }
+
+  runHealthCheck(){
+    const { scriptUrl, apiToken, connected } = this.state.backend;
+    if (!connected) { this.appendLog('Connect to Google Sheets first', 'warn'); return; }
+    fetch(scriptUrl + '?action=health_check&token=' + encodeURIComponent(apiToken)).then(r=>r.json()).then(res => {
+      if (res.ok) { this.setState({ dbHealth: res }); this.appendLog('Health check OK', 'ok'); }
+      else this.appendLog('Health check failed: ' + res.error, 'error');
+    }).catch(err => this.appendLog('Health check failed: ' + err, 'error'));
+  }
+
+  saveRevision(){
+    const S = this.state;
+    const label = 'Revision ' + (S.revisions.length + 1);
+    const snapshot = JSON.parse(this.dataSignature(S));
+    this.setState(s => ({ revisions: [{ id:'rev'+(s.revisions.length+1), label, timestamp: new Date().toLocaleString(), snapshot }, ...s.revisions] }));
+    this.appendLog('Saved ' + label, 'ok');
+  }
+
+  restoreRevision(rev){
+    this.setState({ ...rev.snapshot });
+    this.appendLog('Restored ' + rev.label, 'ok');
+  }
+
+  exportToExcel(){
+    const S = this.state;
+    let rows = [['Item','Qty','Mode','Material Cost','Labor Cost','Line Total']];
+    S.boq.forEach(r => rows.push([r.label, r.qtyLabel, r.mode, r.materialCost.toFixed(2), r.laborCost.toFixed(2), (r.materialCost+r.laborCost).toFixed(2)]));
+    const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g,'""') + '"').join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob); link.download = 'BOQ_' + S.currentProjectId + '.csv';
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  }
+
+  exportReport(){
+    if (this.state.reportSettings.format === 'xls') this.exportToExcel();
+    else window.print();
+  }
+
+  computeCalc(){
+    const wt = this.state.workType, f = this.state[wt];
+    let rows = [], materialCost = 0, laborCost = 0, unit = 'sqm', qtyBase = 0, qtyLabel = '', desc = '';
+    const waste = 1 + this.n(f.wastage)/100;
+    const supply = f.mode === 'supplyInstall';
+    if (wt === 'chb') {
+      const area = Math.max(0, this.n(f.length)*this.n(f.height) - this.n(f.openingsArea));
+      const blocks = area*this.n(f.blockCoeff)*waste, cement = area*this.n(f.cementCoeff)*waste, sand = area*this.n(f.sandCoeff)*waste;
+      rows = [ {label:'Wall Area', value: area.toFixed(2)+' sqm'}, {label:'CHB Blocks', value: Math.ceil(blocks)+' pcs'}, {label:'Cement', value: cement.toFixed(2)+' bags'}, {label:'Sand', value: sand.toFixed(2)+' cu.m'} ];
+      materialCost = supply ? 0 : blocks*this.n(f.blockPrice) + cement*this.n(f.cementPrice) + sand*this.n(f.sandPrice);
+      laborCost = area*this.n(f.pakyawRate); unit = 'sqm'; qtyBase = area; qtyLabel = area.toFixed(2)+' sqm';
+      desc = 'CHB Wall, '+f.thickness+'in — '+area.toFixed(1)+' sqm';
+    } else if (wt === 'rebar') {
+      const d = this.n(f.diameter), unitWeight = (d*d)/162, totalKg = this.n(f.totalLength)*unitWeight*waste;
+      rows = [ {label:'Unit Weight', value: unitWeight.toFixed(3)+' kg/m'}, {label:'Total Weight', value: totalKg.toFixed(2)+' kg'} ];
+      materialCost = supply ? 0 : totalKg*this.n(f.unitPriceKg);
+      const basis = f.rateUnit === 'lm' ? this.n(f.totalLength) : totalKg;
+      laborCost = basis*this.n(f.pakyawRate); unit = f.rateUnit; qtyBase = totalKg; qtyLabel = totalKg.toFixed(1)+' kg';
+      desc = 'Rebar Ø'+f.diameter+'mm — '+totalKg.toFixed(1)+' kg';
+    } else if (wt === 'concrete') {
+      const vol = Math.max(0, this.n(f.length)*this.n(f.width)*this.n(f.thickness))*waste;
+      const cement = vol*this.n(f.cementCoeff), sand = vol*this.n(f.sandCoeff), gravel = vol*this.n(f.gravelCoeff);
+      rows = [ {label:'Volume', value: vol.toFixed(2)+' cu.m'}, {label:'Cement', value: cement.toFixed(2)+' bags'}, {label:'Sand', value: sand.toFixed(2)+' cu.m'}, {label:'Gravel', value: gravel.toFixed(2)+' cu.m'} ];
+      materialCost = supply ? 0 : cement*this.n(f.cementPrice) + sand*this.n(f.sandPrice) + gravel*this.n(f.gravelPrice);
+      laborCost = vol*this.n(f.pakyawRate); unit = 'cu.m'; qtyBase = vol; qtyLabel = vol.toFixed(2)+' cu.m';
+      desc = 'Concrete Class '+f.mixClass+' — '+vol.toFixed(2)+' cu.m';
+    } else if (wt === 'plaster') {
+      const area = this.n(f.length)*this.n(f.height)*this.n(f.sides)*waste;
+      const cement = area*this.n(f.cementCoeff), sand = area*this.n(f.sandCoeff);
+      rows = [ {label:'Plastered Area', value: area.toFixed(2)+' sqm'}, {label:'Cement', value: cement.toFixed(2)+' bags'}, {label:'Sand', value: sand.toFixed(2)+' cu.m'} ];
+      materialCost = supply ? 0 : cement*this.n(f.cementPrice) + sand*this.n(f.sandPrice);
+      laborCost = area*this.n(f.pakyawRate); unit = 'sqm'; qtyBase = area; qtyLabel = area.toFixed(2)+' sqm';
+      desc = 'Plastering, '+(f.sides==='2'?'2 sides':'1 side')+' — '+area.toFixed(1)+' sqm';
+    } else if (wt === 'gypsum') {
+      const area = this.n(f.area)*waste;
+      const boards = area*this.n(f.boardCoeff), furring = area*this.n(f.furringCoeff), screws = area*this.n(f.screwCoeff);
+      rows = [ {label:'Area', value: area.toFixed(2)+' sqm'}, {label:'Gypsum Boards', value: Math.ceil(boards)+' pcs'}, {label:'Metal Furring', value: furring.toFixed(1)+' lm'}, {label:'Screws', value: Math.ceil(screws)+' pcs'} ];
+      materialCost = supply ? 0 : boards*this.n(f.boardPrice) + furring*this.n(f.furringPrice) + screws*this.n(f.screwPrice);
+      laborCost = area*this.n(f.pakyawRate); unit = 'sqm'; qtyBase = area; qtyLabel = area.toFixed(2)+' sqm';
+      desc = 'Gypsum '+(f.type==='partition'?'Partition':'Ceiling')+' — '+area.toFixed(1)+' sqm';
+    } else if (wt === 'paint') {
+      const area = this.n(f.area);
+      const liters = (area*this.n(f.coats)/Math.max(1,this.n(f.coverage)))*waste;
+      const primerLiters = f.primer === 'yes' ? (area/Math.max(1,this.n(f.coverage)))*waste : 0;
+      rows = [ {label:'Area', value: area.toFixed(2)+' sqm'}, {label:'Paint Needed', value: liters.toFixed(2)+' L'}, {label:'Primer Needed', value: primerLiters.toFixed(2)+' L'} ];
+      materialCost = supply ? 0 : liters*this.n(f.paintPrice) + primerLiters*this.n(f.primerPrice);
+      laborCost = area*this.n(f.pakyawRate); unit = 'sqm'; qtyBase = area; qtyLabel = area.toFixed(2)+' sqm';
+      desc = 'Painting, '+f.coats+' coats — '+area.toFixed(1)+' sqm';
+    }
+    return { rows, materialCost, laborCost, materialCostFmt: this.peso(materialCost), laborCostFmt: this.peso(laborCost), lineTotalFmt: this.peso(materialCost+laborCost), unit, qtyBase, qtyLabel, desc, mode: f.mode };
+  }
+
+  addToBoq(){
+    const calc = this.computeCalc();
+    if (calc.qtyBase <= 0) return;
+    const id = this.state.boqSeq;
+    this.setState(s => ({
+      boq: [...s.boq, { id, workType: s.workType, label: calc.desc, qtyLabel: calc.qtyLabel, materialCost: calc.materialCost, laborCost: calc.laborCost, mode: calc.mode }],
+      boqSeq: id + 1,
+    }));
+  }
+  removeBoqRow(id){ this.setState(s => ({ boq: s.boq.filter(r => r.id !== id) })); }
+
+  renderVals() {
+    const S = this.state;
+    const nav = [
+      {key:'dashboard', label:'Dashboard'}, {key:'projects', label:'Projects'}, {key:'estimator', label:'Estimator'},
+      {key:'boq', label:'BOQ / Reports — ', hide:true},
+    ];
+    const navDefs = [
+      {key:'dashboard', label:'Dashboard'}, {key:'projects', label:'Projects'}, {key:'estimator', label:'Estimator'},
+      {key:'boq', label:'Bill of Quantities'}, {key:'library', label:'Cost Library'}, {key:'reports', label:'Reports'}, {key:'settings', label:'Settings'},
+    ];
+    const navItems = navDefs.map(it => ({
+      label: it.label,
+      onClick: () => this.setState({screen: it.key}),
+      dotColor: S.screen===it.key ? '#fff' : 'oklch(0.4 0.03 255)',
+      weight: S.screen===it.key ? 700 : 500,
+      style: `display:flex;align-items:center;gap:10px;padding:10px 20px;cursor:pointer;color:${S.screen===it.key?'#fff':'oklch(0.72 0.02 255)'};background:${S.screen===it.key?'oklch(0.28 0.08 255)':'transparent'};`,
+    }));
+
+    const workTypeDefs = [
+      {key:'chb', label:'CHB Wall'}, {key:'rebar', label:'Rebar'}, {key:'concrete', label:'Concrete'},
+      {key:'plaster', label:'Plastering'}, {key:'gypsum', label:'Gypsum'}, {key:'paint', label:'Painting'},
+    ];
+    const workTypeTabs = workTypeDefs.map(t => ({
+      label: t.label,
+      onClick: () => this.setState({workType: t.key}),
+      style: `padding:9px 16px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid ${S.workType===t.key?'oklch(0.28 0.06 255)':'oklch(0.89 0.01 255)'};background:${S.workType===t.key?'oklch(0.28 0.06 255)':'#fff'};color:${S.workType===t.key?'#fff':'oklch(0.3 0.02 255)'};`,
+    }));
+
+    const labelStyle = 'display:block;font-size:11.5px;font-weight:600;color:oklch(0.5 0.02 255);margin-bottom:6px;';
+    const inputStyle = 'width:100%;box-sizing:border-box;border:1px solid oklch(0.85 0.01 255);border-radius:7px;padding:9px 11px;font-size:13.5px;color:oklch(0.22 0.015 255);';
+    const inputStyleSmall = 'width:60px;box-sizing:border-box;border:1px solid oklch(0.85 0.01 255);border-radius:7px;padding:9px 11px;font-size:13.5px;';
+    const inputStyleRight = 'width:140px;box-sizing:border-box;border:1px solid oklch(0.85 0.01 255);border-radius:7px;padding:8px 11px;font-size:13px;text-align:right;';
+
+    const pill = (active) => `padding:8px 14px;border-radius:7px;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid ${active?'oklch(0.28 0.06 255)':'oklch(0.89 0.01 255)'};background:${active?'oklch(0.28 0.06 255)':'#fff'};color:${active?'#fff':'oklch(0.3 0.02 255)'};`;
+
+    const f = S[S.workType];
+    const h = {};
+    ['length','height','openingsArea','wastage','blockCoeff','cementCoeff','sandCoeff','blockPrice','cementPrice','sandPrice','pakyawRate',
+     'diameter','totalLength','unitPriceKg','width','thickness','gravelCoeff','gravelPrice','area','boardCoeff','furringCoeff','screwCoeff',
+     'boardPrice','furringPrice','screwPrice','coats','coverage','paintPrice','primerPrice'].forEach(field => { h[field] = this.makeHandler(S.workType, field); });
+
+    const calc = this.computeCalc();
+
+    const screenTitles = {dashboard:'Dashboard', projects:'Projects', estimator:'Estimator', boq:'Bill of Quantities', library:'Cost Library', reports:'Reports', settings:'Settings'};
+
+    const summary = S.summary;
+    const h2 = {
+      equipment: e => this.setState(s => ({summary:{...s.summary, equipment:e.target.value}})),
+      delivery: e => this.setState(s => ({summary:{...s.summary, delivery:e.target.value}})),
+      overheadPct: e => this.setState(s => ({summary:{...s.summary, overheadPct:e.target.value}})),
+      contingencyPct: e => this.setState(s => ({summary:{...s.summary, contingencyPct:e.target.value}})),
+      profitPct: e => this.setState(s => ({summary:{...s.summary, profitPct:e.target.value}})),
+      taxPct: e => this.setState(s => ({summary:{...s.summary, taxPct:e.target.value}})),
+    };
+
+    const materialsSubtotal = S.boq.reduce((a,r)=>a+r.materialCost,0);
+    const laborSubtotal = S.boq.reduce((a,r)=>a+r.laborCost,0);
+    const base = materialsSubtotal + laborSubtotal + this.n(summary.equipment) + this.n(summary.delivery);
+    const overheadAmt = base * this.n(summary.overheadPct)/100;
+    const contingencyAmt = base * this.n(summary.contingencyPct)/100;
+    const profitAmt = (base+overheadAmt+contingencyAmt) * this.n(summary.profitPct)/100;
+    const preTax = base+overheadAmt+contingencyAmt+profitAmt;
+    const taxAmt = summary.taxEnabled ? preTax * this.n(summary.taxPct)/100 : 0;
+    const grandTotal = preTax + taxAmt;
+
+    const summaryRows = [
+      {label:'Materials Subtotal', value: this.peso(materialsSubtotal)},
+      {label:'Pakyaw Labor Subtotal', value: this.peso(laborSubtotal)},
+      {label:'Equipment', value: this.peso(summary.equipment)},
+      {label:'Delivery', value: this.peso(summary.delivery)},
+      {label:'Overhead ('+this.n(summary.overheadPct)+'%)', value: this.peso(overheadAmt)},
+      {label:'Contingency ('+this.n(summary.contingencyPct)+'%)', value: this.peso(contingencyAmt)},
+      {label:'Profit ('+this.n(summary.profitPct)+'%)', value: this.peso(profitAmt)},
+    ];
+    if (summary.taxEnabled) summaryRows.push({label:'VAT ('+this.n(summary.taxPct)+'%)', value: this.peso(taxAmt)});
+
+    const boqRows = S.boq.map(r => ({
+      label: r.label, qtyLabel: r.qtyLabel,
+      modeLabel: r.mode === 'supplyInstall' ? 'Supply & Install' : 'Labor Only',
+      modeBadge: `display:inline-block;padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;background:${r.mode==='supplyInstall'?'oklch(0.95 0.03 155)':'oklch(0.95 0.015 255)'};color:${r.mode==='supplyInstall'?'oklch(0.4 0.1 155)':'oklch(0.4 0.02 255)'};`,
+      materialFmt: r.materialCost>0 ? this.peso(r.materialCost) : 'Included',
+      laborFmt: this.peso(r.laborCost),
+      totalFmt: this.peso(r.materialCost+r.laborCost),
+      remove: () => this.removeBoqRow(r.id),
+    }));
+
+    const h3 = {
+      companyName: e => this.setState(s=>({company:{...s.company, name:e.target.value}})),
+      companyAddress: e => this.setState(s=>({company:{...s.company, address:e.target.value}})),
+      companyContact: e => this.setState(s=>({company:{...s.company, contact:e.target.value}})),
+      terms: e => this.setState(s=>({reportSettings:{...s.reportSettings, terms:e.target.value}})),
+    };
+    const h4 = {
+      scriptUrl: e => this.setState(s=>({backend:{...s.backend, scriptUrl:e.target.value}})),
+      apiToken: e => this.setState(s=>({backend:{...s.backend, apiToken:e.target.value}})),
+    };
+
+    const libMaterials = S.libMaterials.map((m,i) => ({ ...m, onChange: e => this.setState(s=>{ const arr=[...s.libMaterials]; arr[i]={...arr[i],price:e.target.value}; return {libMaterials:arr}; }) }));
+    const libLabor = S.libLabor.map((l,i) => ({ ...l,
+      onChangeLO: e => this.setState(s=>{ const arr=[...s.libLabor]; arr[i]={...arr[i],laborOnly:e.target.value}; return {libLabor:arr}; }),
+      onChangeSI: e => this.setState(s=>{ const arr=[...s.libLabor]; arr[i]={...arr[i],supplyInstall:e.target.value}; return {libLabor:arr}; }),
+    }));
+
+    const badge = (bg,fg) => `padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;background:${bg};color:${fg};`;
+    const badgeInProgress = badge('oklch(0.94 0.03 255)','oklch(0.4 0.12 255)');
+    const statusBadges = { 'In Progress': badgeInProgress, 'For Review': badge('oklch(0.96 0.03 70)','oklch(0.45 0.1 70)'), 'Draft': badge('oklch(0.95 0.01 255)','oklch(0.5 0.02 255)'), 'Approved': badge('oklch(0.95 0.03 155)','oklch(0.4 0.1 155)') };
+    const fmtVal = v => '₱' + this.n(v).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
+    const projectsList = S.projects.map(p => ({
+      ...p, value: fmtVal(p.value), badgeStyle: statusBadges[p.status] || statusBadges['Draft'],
+      currentTag: p.id === S.currentProjectId ? '  ·  current' : '',
+      rowStyle: `border-top:1px solid oklch(0.94 0.01 255);cursor:pointer;${p.id===S.currentProjectId?'background:oklch(0.98 0.015 255);':''}`,
+      open: () => this.loadProject(p.id),
+      remove: (e) => { e.stopPropagation(); this.deleteProject(p.id, p.name); },
+    }));
+    const recentProjects = projectsList.slice(0,5);
+
+    const kpis = [
+      {label:'Active Projects', value: String(S.projects.length), sub:'+2 this month', subColor:'oklch(0.55 0.13 155)'},
+      {label:'Pipeline Value', value: fmtVal(S.projects.reduce((a,p)=>a+p.value,0)), sub:'Across '+S.projects.length+' estimates', subColor:'oklch(0.55 0.02 255)'},
+      {label:'Pending Approvals', value:'3', sub:'Awaiting client sign-off', subColor:'oklch(0.6 0.13 70)'},
+      {label:'Last Sheets Sync', value: S.lastSyncAt ? S.lastSyncAt.toLocaleTimeString() : 'Not yet', sub: S.backend.connected ? 'Backend connected' : 'Connect in Settings', subColor: S.backend.connected ? 'oklch(0.55 0.13 155)' : 'oklch(0.58 0.15 25)'},
+    ];
+
+    const sheetMapping = [
+      {app:'Project Name', sheet:"Sheet 'Projects'"}, {app:'BOQ Line Items', sheet:"Sheet 'BOQ'"},
+      {app:'Cost Summary', sheet:"Sheet 'CostSummary'"}, {app:'Revision Log', sheet:"Sheet 'Revisions'"},
+    ];
+    const syncLog = S.syncLogEntries.length ? S.syncLogEntries : [ {text:'No sync activity yet', dotColor:'oklch(0.7 0.01 255)', time:'—'} ];
+    const revisionsList = S.revisions.map(r => ({ ...r, restore: () => this.restoreRevision(r) }));
+
+    return {
+      screen: S.screen, screenTitle: screenTitles[S.screen], autosaveTime:'just now',
+      isDashboard: S.screen==='dashboard', isProjects: S.screen==='projects', isEstimator: S.screen==='estimator',
+      isBoq: S.screen==='boq', isLibrary: S.screen==='library', isReports: S.screen==='reports', isSettings: S.screen==='settings',
+      goEstimator: () => this.setState({screen:'estimator'}), goReports: () => this.setState({screen:'reports'}),
+      navItems, kpis, recentProjects, projectsList,
+      workTypeTabs, isChb: S.workType==='chb', isRebar: S.workType==='rebar', isConcrete: S.workType==='concrete',
+      isPlaster: S.workType==='plaster', isGypsum: S.workType==='gypsum', isPaint: S.workType==='paint',
+      f, h, labelStyle, inputStyle, inputStyleSmall, inputStyleRight, calc,
+      isSupplyMode: f.mode === 'supplyInstall',
+      chbThickStyle4: pill(f.thickness==='4'), chbThickStyle6: pill(f.thickness==='6'), chbThickStyle8: pill(f.thickness==='8'),
+      setThickness4: () => this.updateForm('chb','thickness','4'), setThickness6: () => this.updateForm('chb','thickness','6'), setThickness8: () => this.updateForm('chb','thickness','8'),
+      rateUnitStyleKg: pill(f.rateUnit==='kg'), rateUnitStyleLm: pill(f.rateUnit==='lm'),
+      setRateUnitKg: () => this.updateForm('rebar','rateUnit','kg'), setRateUnitLm: () => this.updateForm('rebar','rateUnit','lm'),
+      classStyleA: pill(f.mixClass==='A'), classStyleB: pill(f.mixClass==='B'), classStyleC: pill(f.mixClass==='C'),
+      setClassA: () => this.setState(s=>({concrete:{...s.concrete, mixClass:'A', cementCoeff:'9.0', sandCoeff:'0.5', gravelCoeff:'1.0'}})),
+      setClassB: () => this.setState(s=>({concrete:{...s.concrete, mixClass:'B', cementCoeff:'7.5', sandCoeff:'0.5', gravelCoeff:'1.0'}})),
+      setClassC: () => this.setState(s=>({concrete:{...s.concrete, mixClass:'C', cementCoeff:'6.0', sandCoeff:'0.5', gravelCoeff:'1.0'}})),
+      sidesStyle1: pill(f.sides==='1'), sidesStyle2: pill(f.sides==='2'),
+      setSides1: () => this.updateForm('plaster','sides','1'), setSides2: () => this.updateForm('plaster','sides','2'),
+      gypTypeStyleCeiling: pill(f.type==='ceiling'), gypTypeStylePartition: pill(f.type==='partition'),
+      setTypeCeiling: () => this.setState(s=>({gypsum:{...s.gypsum, type:'ceiling', boardCoeff:'0.36'}})),
+      setTypePartition: () => this.setState(s=>({gypsum:{...s.gypsum, type:'partition', boardCoeff:'0.72'}})),
+      primerStyleYes: pill(f.primer==='yes'), primerStyleNo: pill(f.primer==='no'),
+      setPrimerYes: () => this.updateForm('paint','primer','yes'), setPrimerNo: () => this.updateForm('paint','primer','no'),
+      modeStyleLaborOnly: pill(f.mode==='laborOnly'), modeStyleSupply: pill(f.mode==='supplyInstall'),
+      setModeLaborOnly: () => this.updateForm(S.workType,'mode','laborOnly'), setModeSupply: () => this.updateForm(S.workType,'mode','supplyInstall'),
+      addToBoq: () => this.addToBoq(),
+      boqCountNote: S.boq.length>0 ? S.boq.length+' item(s) currently in BOQ.' : 'Add your first item to start building the BOQ.',
+      boqRows, boqEmpty: S.boq.length===0,
+      summary, h2, summaryRows, grandTotalFmt: this.peso(grandTotal),
+      taxToggleStyle: `width:34px;height:19px;border-radius:10px;background:${summary.taxEnabled?'oklch(0.55 0.13 155)':'oklch(0.88 0.01 255)'};cursor:pointer;position:relative;padding:2px;box-sizing:border-box;`,
+      taxKnobStyle: `width:15px;height:15px;border-radius:50%;background:#fff;transform:translateX(${summary.taxEnabled?'15px':'0'});transition:transform 0.15s;`,
+      toggleTax: () => this.setState(s=>({summary:{...s.summary, taxEnabled: !s.summary.taxEnabled}})),
+      libMaterials, libLabor,
+      company: S.company, reportSettings: {...S.reportSettings, formatLabel: S.reportSettings.format==='pdf'?'PDF':'Excel'}, h3,
+      formatStylePdf: pill(S.reportSettings.format==='pdf'), formatStyleXls: pill(S.reportSettings.format==='xls'),
+      setFormatPdf: () => this.setState(s=>({reportSettings:{...s.reportSettings, format:'pdf'}})),
+      setFormatXls: () => this.setState(s=>({reportSettings:{...s.reportSettings, format:'xls'}})),
+      sigToggleStyle: `width:34px;height:19px;border-radius:10px;background:${S.reportSettings.includeSignature?'oklch(0.55 0.13 155)':'oklch(0.88 0.01 255)'};cursor:pointer;position:relative;padding:2px;box-sizing:border-box;`,
+      sigKnobStyle: `width:15px;height:15px;border-radius:50%;background:#fff;transform:translateX(${S.reportSettings.includeSignature?'15px':'0'});transition:transform 0.15s;`,
+      toggleSignature: () => this.setState(s=>({reportSettings:{...s.reportSettings, includeSignature: !s.reportSettings.includeSignature}})),
+      noop: () => {},
+      backend: S.backend, h4,
+      sheetsStatusBadge: `padding:3px 10px;border-radius:5px;font-size:11px;font-weight:700;background:${S.backend.connected?'oklch(0.95 0.03 155)':'oklch(0.95 0.015 255)'};color:${S.backend.connected?'oklch(0.4 0.1 155)':'oklch(0.5 0.02 255)'};`,
+      sheetsStatusLabel: S.backend.connected ? 'Connected' : 'Not Connected',
+      sheetsConnectLabel: S.backend.connected ? 'Reconnect' : 'Connect',
+      connectSheets: () => this.testConnection(),
+      sheetMapping, syncLog, revisionsList, revisionsEmpty: S.revisions.length===0,
+      currentProjectName: (S.projects.find(p=>p.id===S.currentProjectId)||{}).name || 'Untitled',
+      syncNow: () => this.syncNow(), saveRevision: () => this.saveRevision(), createNewProject: () => this.createNewProject(),
+      exportReport: () => this.exportReport(),
+      syncStatusLabel: { saved: 'Saved' + (S.lastSyncAt ? ' ' + S.lastSyncAt.toLocaleTimeString() : ''), saving: 'Saving…', offline: 'Offline — working locally', error: 'Sync Failed — tap to retry', conflict: 'Conflict — reload needed' }[S.syncStatus],
+      syncDotStyle: `width:7px;height:7px;border-radius:50%;background:${ {saved:'oklch(0.65 0.14 155)', saving:'oklch(0.75 0.14 70)', offline:'oklch(0.65 0.01 255)', error:'oklch(0.6 0.18 25)', conflict:'oklch(0.6 0.18 25)'}[S.syncStatus] };${S.syncStatus==='saving'?'animation:pulse 1s infinite;':''}`,
+      isConflict: S.syncStatus === 'conflict', conflictInfo: S.conflictInfo, reloadLatest: () => this.reloadLatest(),
+      showTrash: S.showTrash, toggleTrash: () => { this.setState(s=>({showTrash: !s.showTrash})); if (!S.showTrash) this.fetchTrash(); },
+      trashedProjects: S.trashedProjects.map(t => ({...t, restore: () => this.restoreProjectFromTrash(t.id)})),
+      migrateLocalData: () => this.migrateLocalData(), runHealthCheck: () => this.runHealthCheck(),
+      dbHealth: S.dbHealth, dbHealthRows: S.dbHealth ? Object.keys(S.dbHealth.counts).map(k => ({name:k, count:S.dbHealth.counts[k]})) : [],
+    };
+  }
+}
+
+</script>
+</body>
+</html>
