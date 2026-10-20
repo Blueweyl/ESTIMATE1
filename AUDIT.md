@@ -211,3 +211,38 @@ Safe to continue as an internal pilot with a small trusted team ONLY after C1–
 10. H6, M3–M7 — accessibility pass, offline-delete durability, BOQ `unit` field, loading states, revision-model cleanup
 
 No Fajardo coefficients were invented or cited anywhere in the reviewed code — defaults are generic, labeled editable, and not attributed to any specific published source, consistent with the standing instruction.
+
+---
+
+## Remediation status (follow-up pass)
+
+Verified with the new automated suite in `tests/` (`npm test`): `Code.gs` runs in Node against a fake in-memory Sheet, and the real page runs in headless Chromium. Both suites pass. A live Apps Script deployment has still **not** been tested. Quotas, real `LockService` behaviour and network timing need the manual `backend/TEST_CHECKLIST.md` pass.
+
+| ID | Status | What changed |
+|---|---|---|
+| C1 | Mitigated | Every data call is POST, with the token in the body only; `doGet` serves `ping` alone. The token input is masked. The token is kept in `sessionStorage` unless "Remember token on this device" is on, and a legacy plaintext copy is moved out of `localStorage`. The architectural limit still applies (see DEPLOYMENT.md §2). |
+| C2 | Fixed | `createNewProject()` resets calculator forms, BOQ, Cost Library, cost summary and revisions to defaults. Company letterhead and report terms are now explicitly global preferences. |
+| C3 | Fixed | Loading a project falls back to defaults, never to the previous project's in-memory state. Autosave is paused while a project loads, and a pending save for the project being left is flushed first. |
+| C4 | Fixed | Each save stores a full snapshot (new `RevisionSnapshots` tab). Restore calls `restore_revision`, applies the snapshot, and the next autosave records it as a new revision. Revisions without a snapshot show "No snapshot" instead of a fake success. |
+| H1 | Fixed | Only one `update_project` is in flight at a time; later edits are queued and sent with the new version. |
+| H2 | Fixed | Calculator inputs for all six work types are saved to `Estimates` (replaced, not appended) and restored on load. |
+| H3 | Fixed | `replaceProjectRows_` reads only the ProjectID column, appends the new rows and deletes just this project's old rows. Other projects' rows are never rewritten. `ensureSheets_` runs once per request instead of on every sheet access. |
+| H4 | Fixed | Pakyaw labor uses the net (un-wasted) quantity for all six types; wastage affects material quantities only. BOQ quantity is the net quantity. |
+| H5 / L1 | Fixed | All calculator, price and summary inputs are clamped to ≥ 0 client-side; the server rejects negative prices, rates, costs and amounts. |
+| H6 | **Open** | Accessibility pass not done (clickable `div`s, unassociated labels). |
+| M1 / M2 | Fixed | CSV export and every Sheets write prefix strings starting with `=`, `+`, `-`, `@` so they stay text. |
+| M3 | Fixed | Offline deletes are queued in `localStorage` and flushed on reconnect. |
+| M4 | Fixed | BOQ lines carry `unit` through to the BOQ sheet and the CSV. |
+| M5 | Fixed | An identical line added again within 800 ms is ignored. |
+| M6 | Fixed | A "Loading project…" banner shows while a project loads, and a dismissible error banner if the load fails. |
+| M7 | Fixed | One revision model: server revisions (with snapshots) when connected; "Save Revision" is a labelled server save. Local-only snapshots are used only when offline. |
+| L6 | Fixed | Free-text fields capped at 500 chars; project name at 200. |
+| L2, L3, L4, L5 | Open | Not addressed. L4 is now exercised against the fake backend (a simulated external version bump produces the conflict banner and no overwrite), not against a live deployment. |
+
+Other defects found and fixed during this pass:
+- `ensureSheets_` added missing columns at the wrong positions, leaving gaps.
+- `toServerProject()` sent `grandTotal: 0` and blanked each project's location and type on every save. It now sends the real totals and keeps the project's metadata.
+- "Connect" only pinged and never checked the token; it now verifies the token with `list_projects`.
+- A saved 0% overhead, contingency, profit or tax reloaded as the default (10/5/15/12%).
+- Projects created offline never reached Sheets: `update_project` returned "Project not found". They are now created on their first save (`createIfMissing`).
+- Switching projects during the 1.2 s autosave delay could save the old project's data under the new project.
