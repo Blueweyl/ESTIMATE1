@@ -1,0 +1,14 @@
+{
+  "name": "quantabuild-tests",
+  "private": true,
+  "description": "End-to-end tests: backend/Code.gs runs in Node against a fake Google Sheet; Estimator.dc.html runs in headless Chromium.",
+  "scripts": {
+    "test": "sh run.sh"
+  },
+  "devDependencies": {
+    "@babel/standalone": "7.29.0",
+    "playwright": "1.56.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}
