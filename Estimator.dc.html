@@ -647,7 +647,7 @@
               <div style="font-size:12.5px;color:oklch(0.5 0.02 255);margin-bottom:14px;">Project data, BOQ, prices and cost summaries sync to a Google Sheet via an Apps Script Web App. See backend/DEPLOYMENT.md for setup. The token is a shared secret: anyone who can use this browser profile can use it, so treat this as an internal tool.</div>
               <label style="{{ labelStyle }}">Apps Script Web App URL</label>
               <input placeholder="https://script.google.com/macros/s/…/exec" value="{{ backend.scriptUrl }}" onChange="{{ h4.scriptUrl }}" style="{{ inputStyle }}"/>
-              <label style="{{ labelStyle }}margin-top:10px;display:block;">API Token</label>
+              <label style="{{ labelStyle }}margin-top:10px;display:block;">API Token (optional — leave blank if you didn't set one)</label>
               <input type="password" placeholder="shared secret from Script Properties" value="{{ backend.apiToken }}" onChange="{{ h4.apiToken }}" style="{{ inputStyle }}"/>
               <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;">
                 <div style="font-size:11.5px;color:oklch(0.5 0.02 255);">Remember token on this device — otherwise it is kept only until this tab closes. Only enable on a computer you trust.</div>
@@ -898,13 +898,13 @@ class Component extends DCLogic {
 
     window.addEventListener('online', () => {
       const b = this.state.backend;
-      if (!b.connected && b.scriptUrl && b.apiToken) this.testConnection();
+      if (!b.connected && b.scriptUrl) this.testConnection();
       else if (this.state.pendingChanges) this.performSync();
       else this.setState({syncStatus:'saved'});
     });
     window.addEventListener('offline', () => this.setState({syncStatus:'offline'}));
     if (!navigator.onLine) this.setState({syncStatus:'offline'});
-    setTimeout(() => { if (this.state.backend.scriptUrl && this.state.backend.apiToken) this.testConnection(); }, 100);
+    setTimeout(() => { if (this.state.backend.scriptUrl) this.testConnection(); }, 100);
   }
 
   componentDidUpdate(){
@@ -1078,7 +1078,6 @@ class Component extends DCLogic {
   testConnection(){
     const { scriptUrl, apiToken } = this.state.backend;
     if (!scriptUrl) { this.appendLog('Enter a Web App URL first', 'warn'); return; }
-    if (!apiToken) { this.appendLog('Enter the API token first', 'warn'); return; }
     this.saveBackendPrefs();
     // list_projects needs the token, so this also verifies it (ping alone would not).
     this.api('list_projects').then(res => {

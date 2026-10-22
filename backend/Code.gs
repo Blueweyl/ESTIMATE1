@@ -4,7 +4,7 @@
  * See backend/DEPLOYMENT.md for deployment and backend/TEST_CHECKLIST.md for verification.
  */
 
-const API_TOKEN_PROP = 'API_TOKEN';           // required shared secret, set in Script Properties
+const API_TOKEN_PROP = 'API_TOKEN';           // optional shared secret in Script Properties; if unset, no token is required
 const ALLOWED_EMAILS_PROP = 'ALLOWED_EMAILS'; // optional: comma-separated list, enforced only if set
 const LOCK_WAIT_MS = 10000;
 const SNAPSHOT_CHUNK = 40000;                 // Sheets cells hold max 50,000 chars
@@ -16,8 +16,8 @@ function getProp_(key) { return PropertiesService.getScriptProperties().getPrope
 
 function authorize_(payload) {
   const expected = getProp_(API_TOKEN_PROP);
-  if (!expected) throw new Error('Server not configured: missing API_TOKEN script property.');
-  if (!payload || payload.token !== expected) throw new Error('Unauthorized: invalid or missing token.');
+  // No token set: the long, unguessable Web App URL is the only gate. Keep the URL private.
+  if (expected && (!payload || payload.token !== expected)) throw new Error('Unauthorized: invalid or missing token.');
 
   const allowList = getProp_(ALLOWED_EMAILS_PROP);
   if (allowList) {
@@ -66,18 +66,10 @@ function ensureSheets_() {
 }
 
 // Run this once from the Apps Script editor (choose "setup" in the function menu, click Run).
-// Functions ending in "_" are private and don't appear in that menu.
-// Creates any missing tabs/columns and, if none exists yet, a random API token.
-// Safe to re-run: never deletes data and never replaces an existing token.
+// Creates any missing tabs/columns. Safe to re-run: never deletes data.
 function setup() {
   ensureSheets_();
-  let token = getProp_(API_TOKEN_PROP);
-  if (!token) {
-    token = 'qb-' + Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '').slice(0, 16);
-    PropertiesService.getScriptProperties().setProperty(API_TOKEN_PROP, token);
-    Logger.log('Created a new API token.');
-  }
-  Logger.log('QuantaBuild sheets are ready. Your API token (paste it into the app\'s Settings → API Token): ' + token);
+  Logger.log('QuantaBuild sheets are ready.');
 }
 
 function sheetByName_(name) { ensureSheets_(); return ss_().getSheetByName(name); }
