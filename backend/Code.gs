@@ -109,35 +109,45 @@ function logSync_(projectId, action, status, message, clientId) {
 
 /** HTTP entry points **/
 
-// GET carries no token: anything in a query string ends up in browser history and
-// Apps Script execution logs. Only the unauthenticated ping is served here.
+// Opening the Web App URL in a browser shows the app itself (the "App" HTML file in
+// this project). GET never carries a token: query strings end up in browser history.
 function doGet(e) {
-  const action = e.parameter.action;
+  const action = e && e.parameter ? e.parameter.action : undefined;
   if (action === 'ping') return json_({ ok: true, time: nowIso_() });
+  if (!action) {
+    return HtmlService.createHtmlOutputFromFile('App')
+      .setTitle('QuantaBuild')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  }
   return json_({ ok: false, error: 'Unknown GET action: ' + action + '. Data actions are POST-only.' });
 }
 
+// Called by the app via google.script.run when it is served from this script.
+function apiCall(contents) { return JSON.stringify(handle_(contents)); }
+
 const READ_ACTIONS = { list_projects: 1, get_project: 1, health_check: 1, restore_revision: 1 };
 
-function doPost(e) {
+function doPost(e) { return json_(handle_(e.postData.contents)); }
+
+function handle_(contents) {
   let payload;
-  try { payload = JSON.parse(e.postData.contents); }
-  catch (err) { return json_({ ok: false, error: 'Invalid JSON body.' }); }
+  try { payload = JSON.parse(contents); }
+  catch (err) { return { ok: false, error: 'Invalid JSON body.' }; }
 
   try { authorize_(payload); }
-  catch (err) { return json_({ ok: false, error: String(err) }); }
+  catch (err) { return { ok: false, error: String(err) }; }
 
   const action = payload.action;
 
   // Reads don't need the write lock.
   if (READ_ACTIONS[action]) {
     try {
-      if (action === 'list_projects') return json_(listProjects_(payload.includeDeleted === true));
-      if (action === 'get_project') return json_(getProject_(payload.projectId));
-      if (action === 'health_check') return json_(healthCheck_());
-      if (action === 'restore_revision') return json_(restoreRevision_(payload));
+      if (action === 'list_projects') return listProjects_(payload.includeDeleted === true);
+      if (action === 'get_project') return getProject_(payload.projectId);
+      if (action === 'health_check') return healthCheck_();
+      if (action === 'restore_revision') return restoreRevision_(payload);
     } catch (err) {
-      return json_({ ok: false, error: String(err) });
+      return { ok: false, error: String(err) };
     }
   }
 
@@ -145,7 +155,7 @@ function doPost(e) {
   let locked = false;
   try {
     locked = lock.tryLock(LOCK_WAIT_MS);
-    if (!locked) return json_({ ok: false, error: 'Server busy, try again.' });
+    if (!locked) return { ok: false, error: 'Server busy, try again.' };
     let result;
     if (action === 'create_project') result = createProject_(payload);
     else if (action === 'update_project') result = updateProject_(payload);
@@ -154,10 +164,10 @@ function doPost(e) {
     else if (action === 'migrate_push') result = migratePush_(payload);
     else if (action === 'log_sync') { logSync_(payload.projectId, payload.logAction, payload.status, payload.message, payload.clientId); result = { ok: true }; }
     else result = { ok: false, error: 'Unknown POST action: ' + action };
-    return json_(result);
+    return result;
   } catch (err) {
     logSync_(payload.projectId, action, 'error', String(err), payload.clientId);
-    return json_({ ok: false, error: String(err) });
+    return { ok: false, error: String(err) };
   } finally {
     if (locked) lock.releaseLock();
   }

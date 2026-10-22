@@ -42,9 +42,9 @@
     };
   }
   function parseDcText(src) {
-    const openMatch = /<x-dc(?:\s[^>]*)?>/.exec(src);
+    const openMatch = /<x\x2ddc(?:\s[^>]*)?>/.exec(src);
     if (!openMatch) return null;
-    const close = src.lastIndexOf("</x-dc>");
+    const close = src.lastIndexOf("</x\x2ddc>");
     if (close === -1 || close < openMatch.index) return null;
     const template = src.slice(openMatch.index + openMatch[0].length, close);
     const doc = new DOMParser().parseFromString(src, "text/html");
@@ -1673,7 +1673,7 @@
           console.error(
             '[dc-runtime] sibling fetch for "' + name + '":',
             url,
-            "has no <x-dc> block \u2014 not a Design Component."
+            "has no <x\x2ddc> block \u2014 not a Design Component."
           );
           return;
         }
@@ -2799,8 +2799,9 @@ class Component extends DCLogic {
       const cur = localStorage.getItem('qb_current');
       if (cur !== null) patch.currentProjectId = cur || null;
     } catch (e) {}
+    if (this.isEmbedded()) patch.backend = { ...(patch.backend || this.state.backend), scriptUrl: 'This Google Sheet (built in)', connected: false };
     this.setState(patch);
-    if (patch.backend) this.saveBackendPrefs();
+    if (patch.backend && !this.isEmbedded()) this.saveBackendPrefs();
 
     const cached = this.readCache(this.state.currentProjectId);
     this.setState({ ...this.blankProjectData(), ...(cached ? { ...cached.data, revisions: cached.revisions } : {}), pendingChanges: !!(cached && cached.dirty) });
@@ -2850,11 +2851,20 @@ class Component extends DCLogic {
 
   clientId_(){ return 'web-' + (this._clientId || (this._clientId = Math.random().toString(36).slice(2))); }
 
+  // Served by the Apps Script Web App itself: talk to it directly, no URL needed.
+  isEmbedded(){ return typeof google !== 'undefined' && !!(google.script && google.script.run); }
+
   // All data calls are POST with the token in the body — never in a URL.
   api(action, body){
     const { scriptUrl, apiToken } = this.state.backend;
-    return fetch(scriptUrl, { method:'POST', body: JSON.stringify({ ...(body || {}), action, token: apiToken, clientId: this.clientId_() }) })
-      .then(r => r.json());
+    const payload = JSON.stringify({ ...(body || {}), action, token: apiToken, clientId: this.clientId_() });
+    if (this.isEmbedded()) {
+      return new Promise((resolve, reject) => google.script.run
+        .withSuccessHandler(s => resolve(JSON.parse(s)))
+        .withFailureHandler(err => reject(err && err.message ? err.message : err))
+        .apiCall(payload));
+    }
+    return fetch(scriptUrl, { method:'POST', body: payload }).then(r => r.json());
   }
 
   computeTotals(S){
@@ -2991,7 +3001,7 @@ class Component extends DCLogic {
   testConnection(){
     const { scriptUrl, apiToken } = this.state.backend;
     if (!scriptUrl) { this.appendLog('Enter a Web App URL first', 'warn'); return; }
-    this.saveBackendPrefs();
+    if (!this.isEmbedded()) this.saveBackendPrefs();
     // list_projects needs the token, so this also verifies it (ping alone would not).
     this.api('list_projects').then(res => {
       if (res.ok) {

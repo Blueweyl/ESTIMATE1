@@ -39,7 +39,8 @@ class Sheet {
 }
 const sheets = {};
 const ss = { getSheetByName: n => sheets[n] || null, insertSheet: n => (sheets[n] = new Sheet(n)) };
-const props = { API_TOKEN: 'test-token' };
+// NO_TOKEN=1 runs without an API_TOKEN property (the optional no-password setup).
+const props = process.env.NO_TOKEN ? {} : { API_TOKEN: 'test-token' };
 const out = obj => ({ setMimeType() { return this; }, body: obj });
 const ctx = {
   SpreadsheetApp: { getActiveSpreadsheet: () => ss },
