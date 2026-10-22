@@ -65,6 +65,15 @@ function ensureSheets_() {
   sheetsEnsured_ = true;
 }
 
+// Run this once from the Apps Script editor (choose "setup" in the function menu, click Run).
+// Functions ending in "_" are private and don't appear in that menu.
+// Creates any missing tabs/columns; safe to re-run, never deletes data.
+function setup() {
+  ensureSheets_();
+  const missing = getProp_(API_TOKEN_PROP) ? '' : ' Next: add the API_TOKEN script property.';
+  Logger.log('QuantaBuild sheets are ready.' + missing);
+}
+
 function sheetByName_(name) { ensureSheets_(); return ss_().getSheetByName(name); }
 
 function headersOf_(sh) { return sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0]; }

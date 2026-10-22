@@ -7,7 +7,7 @@ Architecture: `Estimator.dc.html` (frontend) → Apps Script Web App (`backend/C
 ## 1. Create the spreadsheet
 1. New Google Sheet, e.g. "QuantaBuild Database".
 2. Extensions → Apps Script → replace the default code with `backend/Code.gs`.
-3. Run `ensureSheets_` once from the editor to create all 9 tabs with headers (Projects, Estimates, Materials, LaborRates, BOQ, CostSummary, Revisions, RevisionSnapshots, SyncLog) and approve the permission prompts. Re-running this function later is always safe — it only adds missing columns, never deletes data (used for schema migrations, e.g. the `Version`/`IsDeleted` columns added for this upgrade).
+3. In the function menu at the top of the editor choose **setup**, then click **Run** (functions ending in `_`, like `ensureSheets_`, are private and never appear in that menu). Run it once to create all 9 tabs with headers (Projects, Estimates, Materials, LaborRates, BOQ, CostSummary, Revisions, RevisionSnapshots, SyncLog) and approve the permission prompts. Re-running `setup` later is always safe — it only adds missing columns, never deletes data (used for schema migrations, e.g. the `Version`/`IsDeleted` columns added for this upgrade).
 
 ## 2. Authorization (no publicly-writable endpoint)
 1. Project Settings → Script Properties → add `API_TOKEN` = a long random secret. Every create/update/delete request is rejected without the exact matching token (`authorize_` in Code.gs) — treat it as a credential, not something pasted into chat or committed to a public repo.
@@ -73,7 +73,7 @@ If you used an earlier version of this app (local-only or backup-style sync) bef
 - **Offline**: edits, new projects and deletions made offline are kept in `localStorage` and synced on reconnect.
 
 ## Upgrading an existing deployment
-Paste the new `Code.gs`, then **Deploy → Manage deployments → Edit → New version**. The `RevisionSnapshots` tab is created automatically on the next request (or run `ensureSheets_`). Revisions saved before this upgrade have no snapshot and show "No snapshot" instead of Restore. `create_revision` was removed; "Save Revision" now does a labelled `update_project`.
+Paste the new `Code.gs`, then **Deploy → Manage deployments → Edit → New version**. The `RevisionSnapshots` tab is created automatically on the next request (or run `setup`). Revisions saved before this upgrade have no snapshot and show "No snapshot" instead of Restore. `create_revision` was removed; "Save Revision" now does a labelled `update_project`.
 
 ## Known limitations
 Every autosave stores a full revision snapshot. For long-running projects the RevisionSnapshots tab grows steadily; archive or prune old rows if the spreadsheet gets large.
