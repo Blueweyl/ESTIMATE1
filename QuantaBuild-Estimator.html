@@ -1,0 +1,3538 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+// GENERATED from dc-runtime/src/*.ts — do not edit. Rebuild with `cd dc-runtime && bun run build`.
+"use strict";
+(() => {
+  var __defProp = Object.defineProperty;
+  var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+  var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+
+  // src/react.ts
+  function getReact() {
+    const R = window.React;
+    if (!R) throw new Error("dc-runtime: window.React is not available yet");
+    return R;
+  }
+  function getReactDOM() {
+    const RD = window.ReactDOM;
+    if (!RD) throw new Error("dc-runtime: window.ReactDOM is not available yet");
+    return RD;
+  }
+  var h = ((...args) => getReact().createElement(
+    ...args
+  ));
+
+  // src/parse.ts
+  function parseDcDocument(doc) {
+    const dc = doc.querySelector("x-dc");
+    if (!dc) return null;
+    const scriptEl = doc.querySelector("script[data-dc-script]");
+    const { props, preview } = parseDataProps(
+      scriptEl?.getAttribute("data-props") ?? null
+    );
+    return {
+      template: dc.innerHTML,
+      js: scriptEl ? scriptEl.textContent || "" : "",
+      props,
+      preview
+    };
+  }
+  function parseDcText(src) {
+    const openMatch = /<x-dc(?:\s[^>]*)?>/.exec(src);
+    if (!openMatch) return null;
+    const close = src.lastIndexOf("</x-dc>");
+    if (close === -1 || close < openMatch.index) return null;
+    const template = src.slice(openMatch.index + openMatch[0].length, close);
+    const doc = new DOMParser().parseFromString(src, "text/html");
+    const scriptEl = doc.querySelector("script[data-dc-script]");
+    const { props, preview } = parseDataProps(
+      scriptEl?.getAttribute("data-props") ?? null
+    );
+    return {
+      template,
+      js: scriptEl ? scriptEl.textContent || "" : "",
+      props,
+      preview
+    };
+  }
+  function parseDataProps(raw) {
+    if (!raw) return { props: null, preview: null };
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return { props: null, preview: null };
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { props: null, preview: null };
+    }
+    const obj = parsed;
+    const preview = obj.$preview && typeof obj.$preview === "object" ? obj.$preview : null;
+    const rest = {};
+    for (const k of Object.keys(obj)) {
+      if (k[0] !== "$") rest[k] = obj[k];
+    }
+    return { props: Object.keys(rest).length ? rest : null, preview };
+  }
+  function dcNameFromPath(pathname) {
+    let p = pathname || "";
+    try {
+      p = decodeURIComponent(p);
+    } catch {
+    }
+    const base = p.split("/").pop() || "Root";
+    return base.replace(/\.dc\.html$/, "").replace(/\.html?$/, "") || "Root";
+  }
+
+  // src/boot.ts
+  var BASE_CSS = `
+    .sc-placeholder{background:color-mix(in srgb,currentColor 8%,transparent);
+      border:1px solid color-mix(in srgb,currentColor 50%,transparent);
+      border-radius:2px;box-sizing:border-box;overflow:hidden}
+    @keyframes sc-shine{0%{background-position:100% 50%}100%{background-position:0% 50%}}
+    html.sc-dc-streaming .sc-placeholder,
+    html.sc-dc-streaming .sc-interp.sc-missing{position:relative;
+      background:color-mix(in srgb,currentColor 5%,transparent);
+      border-color:transparent}
+    html.sc-dc-streaming .sc-placeholder::before,
+    html.sc-dc-streaming .sc-interp.sc-missing::before{content:'';
+      position:absolute;inset:0;pointer-events:none;
+      background:linear-gradient(90deg,rgba(217,119,87,0) 25%,rgba(247,225,211,.95) 37%,rgba(217,119,87,0) 63%);
+      background-size:400% 100%;animation:sc-shine 1.4s ease infinite}
+    html.sc-dc-streaming .sc-placeholder:nth-child(n+9 of .sc-placeholder)::before,
+    html.sc-dc-streaming .sc-interp.sc-missing:nth-child(n+9 of .sc-interp.sc-missing)::before{animation:none;
+      background:color-mix(in srgb,currentColor 8%,transparent)}
+    .sc-placeholder-error{padding:4px 8px;font:11px/1.4 ui-monospace,monospace;
+      color:color-mix(in srgb,currentColor 70%,transparent);word-break:break-word}
+    .sc-interp.sc-missing{display:inline-block;width:2em;height:1em;overflow:hidden;
+      vertical-align:text-bottom;background:rgba(255,255,255,.3);border:1px solid rgba(0,0,0,.5);
+      border-radius:2px;box-sizing:border-box;color:transparent;
+      user-select:none}
+    .sc-interp.sc-unresolved{font-family:ui-monospace,monospace;font-size:.85em;
+      color:color-mix(in srgb,currentColor 50%,transparent);
+      background:color-mix(in srgb,currentColor 10%,transparent);border-radius:3px;
+      padding:0 3px}
+    .sc-host.sc-has-error{position:relative}
+    .sc-logic-error{position:absolute;top:8px;left:8px;z-index:2147483647;max-width:60ch;
+      padding:6px 10px;background:#b00020;color:#fff;font:12px/1.4 ui-monospace,monospace;
+      border-radius:4px;white-space:pre-wrap;pointer-events:none}
+    /* Mirrors PRINT_BASELINE_CSS in apps/web deck-stage-export.ts \u2014 keep both
+       in sync until dc-runtime regains a build step. */
+    @media print {
+      @page { margin: 0.5cm; }
+      figure, table { break-inside: avoid; }
+      #dc-root, #dc-root > .sc-host { height: auto; }
+      *, *::before, *::after {
+        print-color-adjust: exact; -webkit-print-color-adjust: exact;
+        backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+        animation-delay: -99s !important; animation-duration: .001s !important;
+        animation-iteration-count: 1 !important; animation-fill-mode: both !important;
+        animation-play-state: running !important; transition-duration: 0s !important;
+      }
+    }
+  `;
+  var FULL_PAGE_CSS = "html,body{height:100%;margin:0}#dc-root,#dc-root>.sc-host{height:100%}";
+  function rootNameForDocument(doc, loc) {
+    let bootPath = loc.pathname || "";
+    if (!/\.dc\.html?$/i.test(safeDecode(bootPath))) {
+      try {
+        bootPath = new URL(doc.baseURI || "/").pathname;
+      } catch {
+      }
+    }
+    return dcNameFromPath(bootPath);
+  }
+  function safeDecode(s) {
+    try {
+      return decodeURIComponent(s);
+    } catch {
+      return s;
+    }
+  }
+  function boot(runtime, doc = document) {
+    const parsed = parseDcDocument(doc);
+    if (!parsed) return null;
+    const React = getReact();
+    const rootName = rootNameForDocument(doc, location);
+    runtime.markFetched(rootName);
+    runtime.setRootName(rootName);
+    runtime.adoptParsed(rootName, parsed);
+    if (!window.__resources) {
+      fetch(location.href).then((res) => res.ok ? res.text() : "").then((t) => {
+        const raw = t ? parseDcText(t) : null;
+        if (raw?.template) runtime.updateHtml(rootName, raw.template);
+      }).catch(() => {
+      });
+    }
+    const dc = doc.querySelector("x-dc");
+    const hostEl = doc.createElement("div");
+    hostEl.id = "dc-root";
+    dc.replaceWith(hostEl);
+    if (!parsed.preview) {
+      const s = doc.createElement("style");
+      s.textContent = FULL_PAGE_CSS;
+      doc.head.appendChild(s);
+    }
+    const Root = runtime.getDC(rootName);
+    const entry = runtime.registry.get(rootName);
+    function StandaloneRoot() {
+      const [, setTick] = React.useState(0);
+      React.useEffect(() => {
+        const sub = () => setTick((n) => n + 1);
+        entry.subs.add(sub);
+        return () => {
+          entry.subs.delete(sub);
+        };
+      }, []);
+      const defaults = React.useMemo(() => {
+        const d = {};
+        for (const k in entry.propsMeta || {}) {
+          const v = entry.propsMeta?.[k]?.default;
+          if (v !== void 0) d[k] = v;
+        }
+        return d;
+      }, [entry.propsMeta]);
+      return h(Root, { ...defaults, ...entry.propOverrides || {} });
+    }
+    const ReactDOM = getReactDOM();
+    if (ReactDOM.createRoot)
+      ReactDOM.createRoot(hostEl).render(h(StandaloneRoot));
+    else ReactDOM.render(h(StandaloneRoot), hostEl);
+    return rootName;
+  }
+
+  // src/expr.ts
+  var IDENT_RE = /^[A-Za-z_$][A-Za-z0-9_$]*/;
+  var NUMBER_RE = /^-?\d+(\.\d+)?$/;
+  function resolve(vals, src) {
+    const expr = String(src).trim();
+    if (!expr) return void 0;
+    if (expr[0] === "(" && expr[expr.length - 1] === ")" && parensWrapWhole(expr)) {
+      return resolve(vals, expr.slice(1, -1));
+    }
+    const eq = findTopLevelEquality(expr);
+    if (eq) {
+      const lv = resolve(vals, expr.slice(0, eq.index));
+      const rv = resolve(vals, expr.slice(eq.index + eq.op.length));
+      switch (eq.op) {
+        case "===":
+          return lv === rv;
+        case "!==":
+          return lv !== rv;
+        case "==":
+          return lv == rv;
+        default:
+          return lv != rv;
+      }
+    }
+    if (expr[0] === "!") return !resolve(vals, expr.slice(1));
+    if (expr === "true") return true;
+    if (expr === "false") return false;
+    if (expr === "null") return null;
+    if (expr === "undefined") return void 0;
+    if (NUMBER_RE.test(expr)) return Number(expr);
+    if (expr.length >= 2 && (expr[0] === '"' || expr[0] === "'") && expr[expr.length - 1] === expr[0]) {
+      return expr.slice(1, -1);
+    }
+    return resolvePath(vals, expr);
+  }
+  function parensWrapWhole(expr) {
+    let depth = 0;
+    for (let i = 0; i < expr.length - 1; i++) {
+      if (expr[i] === "(") depth++;
+      else if (expr[i] === ")") {
+        depth--;
+        if (depth === 0) return false;
+      }
+    }
+    return true;
+  }
+  function findTopLevelEquality(expr) {
+    let depth = 0;
+    for (let i = 0; i < expr.length; i++) {
+      const c = expr[i];
+      if (c === "[" || c === "(") depth++;
+      else if (c === "]" || c === ")") depth--;
+      else if (depth === 0 && (c === "=" || c === "!") && expr[i + 1] === "=") {
+        if (i > 0 && (expr[i - 1] === "=" || expr[i - 1] === "!")) continue;
+        if (!expr.slice(0, i).trim()) continue;
+        const op = expr[i + 2] === "=" ? c + "==" : c + "=";
+        return { index: i, op };
+      }
+    }
+    return null;
+  }
+  function resolvePath(vals, expr) {
+    const head = expr.match(IDENT_RE);
+    if (!head) return void 0;
+    let cur = vals == null ? void 0 : vals[head[0]];
+    let i = head[0].length;
+    while (i < expr.length) {
+      if (expr[i] === ".") {
+        const m = expr.slice(i + 1).match(IDENT_RE) || expr.slice(i + 1).match(/^\d+/);
+        if (!m) return void 0;
+        cur = cur == null ? void 0 : cur[m[0]];
+        i += 1 + m[0].length;
+      } else if (expr[i] === "[") {
+        let depth = 1;
+        let j = i + 1;
+        while (j < expr.length && depth > 0) {
+          if (expr[j] === "[") depth++;
+          else if (expr[j] === "]") {
+            depth--;
+            if (depth === 0) break;
+          }
+          j++;
+        }
+        if (depth !== 0) return void 0;
+        const key = resolve(vals, expr.slice(i + 1, j));
+        cur = cur == null ? void 0 : cur[key];
+        i = j + 1;
+      } else {
+        return void 0;
+      }
+    }
+    return cur;
+  }
+
+  // src/encode.ts
+  var CAMEL_ATTR = "sc-camel-";
+  var INLINE_TEXT_TAGS = new Set(
+    "a abbr b bdi bdo br cite code del dfn em i ins kbd mark q s samp small span strike strong sub sup u var wbr".split(
+      " "
+    )
+  );
+  var RAW_WRAP = {
+    select: "sc-raw-select",
+    table: "sc-raw-table",
+    tbody: "sc-raw-tbody",
+    thead: "sc-raw-thead",
+    tfoot: "sc-raw-tfoot",
+    tr: "sc-raw-tr",
+    td: "sc-raw-td",
+    th: "sc-raw-th",
+    caption: "sc-raw-caption"
+  };
+  var RAW_UNWRAP = Object.fromEntries(
+    Object.entries(RAW_WRAP).map(([k, v]) => [v, k])
+  );
+  var EVENT_MAP = {
+    onclick: "onClick",
+    onchange: "onChange",
+    oninput: "onInput",
+    onsubmit: "onSubmit",
+    onkeydown: "onKeyDown",
+    onkeyup: "onKeyUp",
+    onkeypress: "onKeyPress",
+    onmousedown: "onMouseDown",
+    onmouseup: "onMouseUp",
+    onmouseenter: "onMouseEnter",
+    onmouseleave: "onMouseLeave",
+    onfocus: "onFocus",
+    onblur: "onBlur",
+    ondoubleclick: "onDoubleClick",
+    oncontextmenu: "onContextMenu",
+    onmousemove: "onMouseMove",
+    onmouseover: "onMouseOver",
+    onmouseout: "onMouseOut",
+    onpointerdown: "onPointerDown",
+    onpointerup: "onPointerUp",
+    onpointermove: "onPointerMove",
+    onpointerenter: "onPointerEnter",
+    onpointerleave: "onPointerLeave",
+    onpointercancel: "onPointerCancel",
+    onpointerover: "onPointerOver",
+    onpointerout: "onPointerOut",
+    ongotpointercapture: "onGotPointerCapture",
+    onlostpointercapture: "onLostPointerCapture",
+    ontouchstart: "onTouchStart",
+    ontouchend: "onTouchEnd",
+    ontouchmove: "onTouchMove",
+    ontouchcancel: "onTouchCancel",
+    ondragstart: "onDragStart",
+    ondragend: "onDragEnd",
+    ondragenter: "onDragEnter",
+    ondragleave: "onDragLeave",
+    ondragover: "onDragOver",
+    onanimationstart: "onAnimationStart",
+    onanimationend: "onAnimationEnd",
+    onanimationiteration: "onAnimationIteration",
+    ontransitionend: "onTransitionEnd"
+  };
+  var ATTRS = `(?:[^>"']|"[^"]*"|'[^']*')*`;
+  var IMPORT_SELF_CLOSE_RE = new RegExp(
+    "<(x-import|dc-import)(" + ATTRS + ")/>",
+    "gi"
+  );
+  var CAMEL_ATTR_RE = /(\s)([a-z]+[A-Z][A-Za-z0-9]*)(\s*=)/g;
+  function encodeCamelAttrs(html) {
+    return html.replace(
+      CAMEL_ATTR_RE,
+      (_, sp, name, eq) => sp + CAMEL_ATTR + name.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase()) + eq
+    );
+  }
+  function encodeCase(html) {
+    html = html.replace(
+      IMPORT_SELF_CLOSE_RE,
+      (_, t, a) => "<" + t + a + "></" + t + ">"
+    );
+    html = html.replace(/<helmet(\s|>)/gi, "<sc-helmet$1");
+    html = html.replace(/<\/helmet\s*>/gi, "</sc-helmet>");
+    html = encodeCamelAttrs(html);
+    for (const [real, alias] of Object.entries(RAW_WRAP)) {
+      html = html.replace(
+        new RegExp("(</?)" + real + "(?=[\\s>])", "gi"),
+        "$1" + alias
+      );
+    }
+    return html;
+  }
+  function kebabToCamel(s) {
+    return s.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  }
+  function cssToObj(css) {
+    const o = {};
+    for (const decl of css.split(";")) {
+      const i = decl.indexOf(":");
+      if (i < 0) continue;
+      const prop = decl.slice(0, i).trim();
+      o[prop.startsWith("--") ? prop : kebabToCamel(prop)] = decl.slice(i + 1).trim();
+    }
+    return o;
+  }
+  function compileAttr(raw) {
+    const whole = raw.match(/^\s*\{\{([\s\S]+?)\}\}\s*$/);
+    if (whole) {
+      const path = whole[1];
+      return (vals) => resolve(vals, path);
+    }
+    if (raw.includes("{{")) {
+      const parts = raw.split(/\{\{([\s\S]+?)\}\}/g);
+      return (vals) => parts.map((s, i) => i & 1 ? resolve(vals, s) ?? "" : s).join("");
+    }
+    return () => raw;
+  }
+
+  // src/compile.ts
+  function collectProps(node, kind, host) {
+    const propGetters = [];
+    const pseudoClasses = [];
+    let hintSize = null;
+    for (const { name, value } of [...node.attributes]) {
+      if (name === "sc-name" || name === "data-dc-tpl") continue;
+      let key = name;
+      if (key.startsWith(CAMEL_ATTR))
+        key = kebabToCamel(key.slice(CAMEL_ATTR.length));
+      if (key === "hint-size") {
+        hintSize = value;
+        continue;
+      }
+      if (key.startsWith("style-")) {
+        pseudoClasses.push(host.pseudoClass(key.slice(6), value));
+        continue;
+      }
+      if (kind !== "dom") {
+        if (key.includes("-") && !(kind === "x-import" && (key.startsWith("aria-") || key.startsWith("data-"))))
+          key = kebabToCamel(key);
+      } else {
+        if (key === "class") key = "className";
+        else if (key === "for") key = "htmlFor";
+        else if (key.startsWith("on"))
+          key = EVENT_MAP[key] || "on" + key[2].toUpperCase() + key.slice(3);
+      }
+      propGetters.push([key, compileAttr(value)]);
+    }
+    return { propGetters, pseudoClasses, hintSize };
+  }
+  var HOST_STYLE_PROPS = /* @__PURE__ */ new Set([
+    "position",
+    "left",
+    "right",
+    "top",
+    "bottom",
+    "inset",
+    "width",
+    "height",
+    "z-index",
+    "transform"
+  ]);
+  function hostPositionStyle(style) {
+    const all = typeof style === "string" ? cssToObj(style) : style != null && typeof style === "object" ? style : null;
+    if (!all) return void 0;
+    const out = {};
+    for (const [k, v] of Object.entries(all)) {
+      const kebab = k.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase());
+      if (HOST_STYLE_PROPS.has(kebab)) out[k] = v;
+    }
+    return Object.keys(out).length ? out : void 0;
+  }
+  function compileTemplate(html, host) {
+    const tpl = document.createElement("template");
+    //! nosemgrep: direct-inner-html-assignment
+    tpl.innerHTML = encodeCase(html);
+    let tplN = 0;
+    (function stamp(node) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        node.setAttribute("data-dc-tpl", String(tplN++));
+      }
+      for (const c of node.childNodes) stamp(c);
+    })(tpl.content);
+    const builders = walkChildren(tpl.content, host);
+    const render = ((vals, ctx) => builders.map((b, i) => b(vals || {}, ctx, i)));
+    render.__annotated = tpl.innerHTML;
+    return render;
+  }
+  function walkChildren(node, host) {
+    return [...node.childNodes].map((c) => walk(c, host)).filter((b) => b != null);
+  }
+  var SLIDE_ID_VALUE_RE = /^[0-9a-f]{8}$/;
+  var DECK_CONTROL_FLOW_RE = /^(sc-if|sc-for|sc-else|dc-import|x-import)$/;
+  var DECK_AUX_RE = /^(template|script|style|sc-helmet|helmet)$/;
+  function isDeckMountTag(el) {
+    if (el.localName === "deck-stage") return true;
+    return el.localName === "x-import" && (el.getAttribute("component-from-global-scope") || "") === "deck-stage";
+  }
+  function walkDeckChildren(el, host) {
+    const pairs = [...el.childNodes].map((c) => ({ c, b: walk(c, host) })).filter((p) => p.b !== null);
+    const kids = pairs.map((p) => p.b);
+    const seen = /* @__PURE__ */ new Set();
+    const wsSeen = /* @__PURE__ */ new Map();
+    const keys = [];
+    const nextSlideId = new Array(pairs.length);
+    {
+      let upcoming = null;
+      for (let j = pairs.length - 1; j >= 0; j--) {
+        const n = pairs[j].c;
+        if (n.nodeType === Node.ELEMENT_NODE) {
+          const t = n.localName;
+          upcoming = !DECK_AUX_RE.test(t) && !DECK_CONTROL_FLOW_RE.test(t) ? n.getAttribute("data-om-slide-id") : null;
+        }
+        nextSlideId[j] = upcoming;
+      }
+    }
+    for (let j = 0; j < pairs.length; j++) {
+      const { c } = pairs[j];
+      if (c.nodeType === Node.TEXT_NODE) {
+        if ((c.nodeValue ?? "").trim() === "") {
+          const base = nextSlideId[j] ? "omid-ws:" + nextSlideId[j] : "omid-ws:aux";
+          const n = wsSeen.get(base) ?? 0;
+          wsSeen.set(base, n + 1);
+          keys.push(n === 0 ? base : base + ":" + n);
+          continue;
+        }
+        return { kids, keys: null };
+      }
+      if (c.nodeType !== Node.ELEMENT_NODE) {
+        keys.push(j);
+        continue;
+      }
+      const child = c;
+      const tag = child.localName;
+      if (DECK_AUX_RE.test(tag)) {
+        keys.push(j);
+        continue;
+      }
+      if (DECK_CONTROL_FLOW_RE.test(tag)) return { kids, keys: null };
+      const v = child.getAttribute("data-om-slide-id");
+      if (!v || !SLIDE_ID_VALUE_RE.test(v) || seen.has(v)) {
+        return { kids, keys: null };
+      }
+      seen.add(v);
+      keys.push("omid:" + v);
+    }
+    return { kids, keys };
+  }
+  function renderDeckKids(kids, kidKeys, vals, ctx) {
+    return kids.map((b, j) => {
+      const k = kidKeys ? kidKeys[j] : j;
+      const out = b(vals, ctx, k);
+      return kidKeys != null && typeof out === "string" ? h(getReact().Fragment, { key: k }, out) : out;
+    });
+  }
+  function walk(node, host) {
+    if (node.nodeType === Node.TEXT_NODE) return walkText(node);
+    if (node.nodeType !== Node.ELEMENT_NODE) return null;
+    const el = node;
+    const tag = el.tagName.toLowerCase();
+    if (tag === "sc-for") return walkFor(el, host);
+    if (tag === "sc-if") return walkIf(el, host);
+    if (tag === "x-import") return walkXImport(el, host);
+    if (tag === "sc-helmet") return host.helmet(el);
+    if (tag === "dc-import") return walkComponent(el, host);
+    return walkElement(el, host);
+  }
+  var warnedHoles = /* @__PURE__ */ new Set();
+  function warnUnresolved(ctx, what) {
+    const key = (ctx?.__name || "?") + "\0" + what;
+    if (warnedHoles.has(key)) return;
+    warnedHoles.add(key);
+    console.warn("[dc-runtime] " + (ctx?.__name || "template") + ": " + what);
+  }
+  function walkText(node) {
+    const txt = node.nodeValue ?? "";
+    if (!txt.includes("{{")) {
+      if (!txt.trim() && !txt.includes(" ")) return null;
+      return () => txt;
+    }
+    const parts = txt.split(/\{\{([\s\S]+?)\}\}/g);
+    return (vals, ctx, key) => h(
+      getReact().Fragment,
+      { key },
+      ...parts.map((p, i) => {
+        if (!(i & 1)) return p;
+        const v = resolve(vals, p);
+        if (v === void 0) {
+          if (!ctx?.__streamingNow) {
+            if (document.body?.hasAttribute("data-dc-editor-on")) {
+              return h(
+                "span",
+                { key: i, className: "sc-interp sc-unresolved" },
+                "{{ " + p.trim() + " }}"
+              );
+            }
+            warnUnresolved(
+              ctx,
+              "{{ " + p.trim() + " }} never resolved \u2014 rendered as empty"
+            );
+            return null;
+          }
+          return h(
+            "span",
+            { key: i, className: "sc-interp sc-missing" },
+            p.trim()
+          );
+        }
+        if (getReact().isValidElement(v) || Array.isArray(v)) {
+          return h(getReact().Fragment, { key: i }, v);
+        }
+        if (v === null || typeof v === "boolean") return null;
+        return h("span", { key: i, className: "sc-interp" }, String(v));
+      })
+    );
+  }
+  function walkFor(el, host) {
+    const listGet = compileAttr(el.getAttribute("list") || "");
+    const asName = el.getAttribute("as") || "item";
+    const hintN = parseInt(el.getAttribute("hint-placeholder-count") || "0", 10);
+    const kids = walkChildren(el, host);
+    const listSrc = el.getAttribute("list") || "";
+    return (vals, ctx, key) => {
+      let list = listGet(vals);
+      if (!Array.isArray(list)) {
+        if (!ctx?.__streamingNow) {
+          if (list !== void 0 && list !== null) {
+            warnUnresolved(
+              ctx,
+              'sc-for list="' + listSrc + '" is not an array (' + typeof list + ")"
+            );
+          }
+          list = [];
+        } else {
+          list = hintN > 0 ? Array(hintN).fill(void 0) : [];
+        }
+      }
+      return h(
+        getReact().Fragment,
+        { key },
+        list.map((item, i) => {
+          const sub = { ...vals, [asName]: item, $index: i };
+          return h(
+            getReact().Fragment,
+            { key: i },
+            kids.map((b, j) => b(sub, ctx, j))
+          );
+        })
+      );
+    };
+  }
+  function walkIf(el, host) {
+    const valGet = compileAttr(el.getAttribute("value") || "");
+    const hintRaw = el.getAttribute("hint-placeholder-val");
+    const hintGet = hintRaw != null ? compileAttr(hintRaw) : null;
+    const kids = walkChildren(el, host);
+    return (vals, ctx, key) => {
+      let v = valGet(vals);
+      if (v === void 0 && hintGet && ctx?.__streamingNow) v = hintGet(vals);
+      return v ? h(
+        getReact().Fragment,
+        { key },
+        kids.map((b, j) => b(vals, ctx, j))
+      ) : null;
+    };
+  }
+  function walkComponent(el, host) {
+    const name = el.getAttribute("name") || el.getAttribute("component") || "";
+    el.removeAttribute("name");
+    el.removeAttribute("component");
+    const tplId = el.getAttribute("data-dc-tpl");
+    const styleRaw = el.getAttribute("style");
+    el.removeAttribute("style");
+    const styleGet = styleRaw != null ? compileAttr(styleRaw) : null;
+    const { propGetters, hintSize } = collectProps(el, "dc-import", host);
+    const kids = walkChildren(el, host);
+    return (vals, ctx, key) => {
+      const props = {
+        key,
+        __hintSize: hintSize,
+        __tplId: tplId,
+        __hostStyle: styleGet ? hostPositionStyle(styleGet(vals)) : void 0
+      };
+      for (const [k, g] of propGetters) {
+        const v = g(vals);
+        if (k === "dcProps") {
+          if (v && typeof v === "object") Object.assign(props, v);
+          continue;
+        }
+        props[k] = v;
+      }
+      if (kids.length) props.children = kids.map((b, j) => b(vals, ctx, j));
+      return h(host.component(name), props);
+    };
+  }
+  function walkXImport(el, host) {
+    const globalNameGet = compileAttr(
+      el.getAttribute("component-from-global-scope") || ""
+    );
+    const exportNameGet = compileAttr(
+      el.getAttribute("component") || el.getAttribute("name") || ""
+    );
+    const fromRaw = el.getAttribute("from") || (el.getAttribute("component-from-global-scope") ? "" : el.getAttribute("src") || el.getAttribute("import") || "");
+    const urls = fromRaw.trim() ? fromRaw.trim().split(/\s+/) : [];
+    const url = urls.length ? urls[urls.length - 1] : "";
+    const kindOf = (u) => /\.(jsx|tsx)(\?|#|$)/i.test(u) ? "jsx" : "js";
+    const tplId = el.getAttribute("data-dc-tpl");
+    const styleRaw = el.getAttribute("style");
+    el.removeAttribute("style");
+    const styleGet = styleRaw != null ? compileAttr(styleRaw) : null;
+    const wrap = tplId != null || styleGet != null;
+    const { propGetters, hintSize } = collectProps(el, "x-import", host);
+    const hasContent = el.children.length > 0 || !!(el.textContent || "").trim();
+    const deckKeyed = hasContent && isDeckMountTag(el) ? walkDeckChildren(el, host) : null;
+    const kids = deckKeyed ? deckKeyed.kids : hasContent ? walkChildren(el, host) : [];
+    const kidKeys = deckKeyed?.keys ?? null;
+    const urlBindable = fromRaw.includes("{{");
+    if (urls.length && !urlBindable) {
+      let prev;
+      for (const u of urls) prev = host.loadExternal(kindOf(u), u, prev);
+    }
+    const evalName = (g, vals) => {
+      const v = g(vals);
+      const s = v == null ? "" : String(v);
+      return s.includes("{{") ? "" : s;
+    };
+    return (vals, ctx, key) => {
+      const globalName = evalName(globalNameGet, vals);
+      const name = globalName || evalName(exportNameGet, vals);
+      const C = !name || urlBindable ? null : globalName ? host.resolveExternalGlobal(url, globalName) : host.resolveExternal(url, name);
+      const hostStyle = styleGet ? hostPositionStyle(styleGet(vals)) : void 0;
+      const wrapper = wrap ? {
+        key,
+        className: "sc-host-x",
+        "data-dc-tpl": tplId,
+        style: hostStyle || { display: "contents" }
+      } : null;
+      if (!C) {
+        const error = urlBindable ? "x-import `from` cannot contain {{ \u2026 }} \u2014 module URLs are resolved at parse time; use a literal URL" : host.resolveExternalError(url, name);
+        const ph = host.placeholder({
+          key: wrapper ? void 0 : key,
+          name,
+          hintSize,
+          error
+        });
+        return wrapper ? h("div", wrapper, ph) : ph;
+      }
+      const props = wrapper ? {} : { key };
+      let unresolvedHole = false;
+      for (const [k, g] of propGetters) {
+        if (k === "component" || k === "componentFromGlobalScope" || k === "from") {
+          continue;
+        }
+        const v = g(vals);
+        if (v === void 0) unresolvedHole = true;
+        if (k === "dcProps") {
+          if (v && typeof v === "object") Object.assign(props, v);
+          continue;
+        }
+        props[k] = v;
+      }
+      if (unresolvedHole && ctx?.__htmlStreamingNow) {
+        const ph = host.placeholder({
+          key: wrapper ? void 0 : key,
+          name,
+          hintSize,
+          error: null
+        });
+        return wrapper ? h("div", wrapper, ph) : ph;
+      }
+      if (kids.length) {
+        props.children = renderDeckKids(kids, kidKeys, vals, ctx);
+      }
+      return wrapper ? h("div", wrapper, h(C, props)) : h(C, props);
+    };
+  }
+  function contentKey(el) {
+    const clone = el.cloneNode(true);
+    for (const d of clone.querySelectorAll("*")) {
+      while (d.attributes.length) d.removeAttribute(d.attributes[0].name);
+    }
+    const s = clone.innerHTML;
+    let h2 = 5381;
+    for (let i = 0; i < s.length; i++) h2 = (h2 << 5) + h2 + s.charCodeAt(i) | 0;
+    return s.length + "." + (h2 >>> 0).toString(36);
+  }
+  var NEVER_CONTENT_KEYED = new Set(
+    "script style textarea option title select canvas iframe video audio".split(
+      " "
+    )
+  );
+  var NOT_INLINE_SELECTOR = ":not(" + [...INLINE_TEXT_TAGS].join(",") + ")";
+  function walkElement(el, host) {
+    const realTag = RAW_UNWRAP[el.localName] || el.localName;
+    const tplId = el.getAttribute("data-dc-tpl");
+    const inlineOnly = el.childNodes.length > 0 && !NEVER_CONTENT_KEYED.has(realTag) && el.querySelector(NOT_INLINE_SELECTOR) === null;
+    const keySuffix = inlineOnly ? "|" + contentKey(el) : "";
+    const { propGetters, pseudoClasses } = collectProps(el, "dom", host);
+    const deckKeyed = isDeckMountTag(el) ? walkDeckChildren(el, host) : null;
+    const kids = deckKeyed ? deckKeyed.kids : walkChildren(el, host);
+    const kidKeys = deckKeyed?.keys ?? null;
+    return (vals, ctx, key) => {
+      const props = {
+        key: key + keySuffix,
+        "data-dc-tpl": tplId
+      };
+      for (const [k, g] of propGetters) {
+        let v = g(vals);
+        if (k === "style" && typeof v === "string") v = cssToObj(v);
+        if ((k === "value" || k === "checked") && v === void 0) {
+          v = k === "checked" ? false : "";
+        }
+        props[k] = v;
+      }
+      if (pseudoClasses.length) {
+        props.className = [props.className, ...pseudoClasses].filter(Boolean).join(" ");
+      }
+      return h(realTag, props, ...renderDeckKids(kids, kidKeys, vals, ctx));
+    };
+  }
+
+  // src/logic.ts
+  var StreamableLogic = class {
+    constructor(props) {
+      __publicField(this, "props");
+      __publicField(this, "state", {});
+      /** Back-pointer to the wrapper component, installed after construction. */
+      __publicField(this, "__host");
+      this.props = props || {};
+    }
+    setState(update, cb) {
+      this.__host && this.__host.__setLogicState(update, cb);
+    }
+    forceUpdate() {
+      this.__host && this.__host.forceUpdate();
+    }
+    componentDidMount() {
+    }
+    componentDidUpdate(_prevProps) {
+    }
+    componentWillUnmount() {
+    }
+    /** The flat object the template renders against (merged over props). */
+    renderVals() {
+      return {};
+    }
+  };
+  function evalDcLogic(src) {
+    //! nosemgrep: eval-and-function-constructor
+    const fn = new Function(
+      "DCLogic",
+      "StreamableLogic",
+      "React",
+      src + '\n;return (typeof Component!=="undefined"&&Component)||undefined;'
+    );
+    return fn(StreamableLogic, StreamableLogic, getReact());
+  }
+
+  // src/component.ts
+  function shallowEqual(a, b) {
+    if (!b) return false;
+    const ak = Object.keys(a).filter((k) => k !== "children");
+    const bk = Object.keys(b).filter((k) => k !== "children");
+    if (ak.length !== bk.length) return false;
+    for (const k of ak) if (a[k] !== b[k]) return false;
+    return true;
+  }
+  function Placeholder({
+    name,
+    hintSize,
+    streaming,
+    error
+  }) {
+    const [w, hgt] = (hintSize || "100%,60px").split(",");
+    return h(
+      "div",
+      {
+        className: "sc-placeholder" + (streaming ? " sc-streaming" : ""),
+        style: { width: w.trim(), height: hgt && hgt.trim() },
+        title: name
+      },
+      error ? h(
+        "div",
+        { className: "sc-placeholder-error" },
+        (name ? name + ": " : "") + error
+      ) : null
+    );
+  }
+  function hintToMin(hint) {
+    if (!hint) return void 0;
+    const [w, hgt] = hint.split(",");
+    return { minWidth: w.trim(), minHeight: hgt && hgt.trim() };
+  }
+  function createComponentFactory(registry, ensureFetched) {
+    const React = getReact();
+    const AncestorContext = React.createContext([]);
+    class StreamableComponent extends React.Component {
+      constructor(props) {
+        super(props);
+        __publicField(this, "__name");
+        __publicField(this, "__sub");
+        __publicField(this, "__needsDidMount", false);
+        /** Snapshot of the registry's streaming flags taken at render time —
+         *  builders read it off the RenderCtx (this) to pick placeholder vs
+         *  render-nothing for unresolved values. */
+        __publicField(this, "__streamingNow", false);
+        __publicField(this, "__htmlStreamingNow", false);
+        /** When a construct throws, remember the (class, registry.ver, props)
+         *  triple so render-time reconcile doesn't re-attempt it on every parent
+         *  re-render. A registry bump (new class, template, external module
+         *  resolving via bumpAll) changes `ver` and breaks the memo so an
+         *  env-dependent constructor can self-heal. */
+        __publicField(this, "__failedLogic", null);
+        __publicField(this, "__failedUserProps", null);
+        __publicField(this, "__failedVer", -1);
+        /** Per-instance constructor error — kept here (not on the registry entry)
+         *  so one instance's successful construct can't hide a sibling's failure,
+         *  and a construct can never wipe an eval error `updateJs` recorded on
+         *  `r.logicError`. */
+        __publicField(this, "__ctorError", null);
+        __publicField(this, "logic");
+        this.__name = props.__name;
+        this.state = { __v: 0, __err: null };
+        this.__sub = () => {
+          if (this.state.__err) this.setState({ __err: null });
+          this.forceUpdate();
+        };
+        this.__makeLogic(registry.get(this.__name).Logic, null);
+        ensureFetched(this.__name);
+      }
+      /** Error-boundary hook: a render crash anywhere in this DC's subtree
+       *  (its own template, an x-import'd component, a child DC without its
+       *  own deeper boundary) lands here instead of unmounting the page. */
+      static getDerivedStateFromError(e) {
+        return { __err: e instanceof Error && e.message ? e.message : String(e) };
+      }
+      componentDidCatch(e, info) {
+        console.error(
+          "[dc-runtime] render error in <" + this.__name + ">:",
+          e,
+          info?.componentStack || ""
+        );
+      }
+      /** Instantiate the logic class (or the no-op base) and adopt `prevState`
+       *  over its initial state — used both at mount and on hot-swap. */
+      __makeLogic(Logic, prevState) {
+        const L = Logic || StreamableLogic;
+        try {
+          this.logic = new L(this.__userProps());
+          this.__failedLogic = null;
+          this.__failedUserProps = null;
+          this.__ctorError = null;
+        } catch (e) {
+          console.error(e);
+          this.__failedLogic = Logic;
+          this.__failedUserProps = this.__userProps();
+          this.__failedVer = registry.get(this.__name).ver;
+          this.__ctorError = this.__name + ": " + (e instanceof Error && e.message ? e.message : String(e));
+          this.logic = new StreamableLogic(
+            this.__userProps()
+          );
+        }
+        this.logic.__host = this;
+        if (prevState)
+          this.logic.state = { ...this.logic.state || {}, ...prevState };
+      }
+      /** The props the author's logic + template see — internal __-prefixed
+       *  wiring stripped. */
+      __userProps() {
+        const { __name, __hintSize, __tplId, __hostStyle, ...rest } = this.props;
+        return rest;
+      }
+      __setLogicState(update, cb) {
+        const prev = this.logic.state;
+        const patch = typeof update === "function" ? update(prev) : update;
+        this.logic.state = { ...prev, ...patch };
+        this.setState((s) => ({ __v: s.__v + 1 }), cb);
+      }
+      /** Swap the logic instance when the registry's Logic class changed
+       *  (streaming completion, hot reload). State carries over; didMount
+       *  re-fires after the swap commits so refs exist. */
+      __reconcileLogic() {
+        const r = registry.get(this.__name);
+        const Next = r.Logic;
+        const Cur = this.logic.constructor;
+        if (Next === Cur || !Next && Cur === StreamableLogic || Next === this.__failedLogic && r.ver === this.__failedVer && shallowEqual(this.__userProps(), this.__failedUserProps)) {
+          return;
+        }
+        if (!this.__needsDidMount) {
+          try {
+            this.logic.componentWillUnmount();
+          } catch (e) {
+            console.error(e);
+          }
+        }
+        this.__makeLogic(Next, this.logic.state);
+        this.__needsDidMount = true;
+      }
+      componentDidMount() {
+        registry.get(this.__name).subs.add(this.__sub);
+        try {
+          this.logic.componentDidMount();
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      componentDidUpdate(prevProps) {
+        this.logic.props = this.__userProps();
+        if (this.__needsDidMount) {
+          if (this.state.__err || !registry.get(this.__name).tpl) return;
+          this.__needsDidMount = false;
+          try {
+            this.logic.componentDidMount();
+          } catch (e) {
+            console.error(e);
+          }
+        } else {
+          try {
+            this.logic.componentDidUpdate(prevProps);
+          } catch (e) {
+            console.error(e);
+          }
+        }
+      }
+      componentWillUnmount() {
+        registry.get(this.__name).subs.delete(this.__sub);
+        if (!this.__needsDidMount) {
+          try {
+            this.logic.componentWillUnmount();
+          } catch (e) {
+            console.error(e);
+          }
+        }
+      }
+      render() {
+        const r = registry.get(this.__name);
+        const cls = "sc-host" + (r.htmlStreaming ? " sc-streaming-html" : "") + (r.jsStreaming ? " sc-streaming-js" : "");
+        const hintStyle = r.htmlStreaming ? hintToMin(this.props.__hintSize) : void 0;
+        const hostStyle = this.props.__hostStyle || hintStyle ? { ...hintStyle || {}, ...this.props.__hostStyle || {} } : void 0;
+        const hostBase = {
+          className: cls,
+          style: hostStyle,
+          "data-sc-name": this.__name,
+          "data-dc-tpl": this.props.__tplId
+        };
+        const chain = Array.isArray(this.context) ? this.context : [];
+        if (chain.includes(this.__name)) {
+          const cycle = [
+            ...chain.slice(chain.indexOf(this.__name)),
+            this.__name
+          ].join(" \u2192 ");
+          return h(
+            "div",
+            { ...hostBase, className: cls + " sc-has-error" },
+            h(Placeholder, {
+              name: this.__name,
+              hintSize: this.props.__hintSize,
+              error: "circular import: " + cycle
+            })
+          );
+        }
+        if (this.state.__err) {
+          return h(
+            "div",
+            { ...hostBase, className: cls + " sc-has-error" },
+            h(
+              "div",
+              { className: "sc-logic-error", "data-omelette-chrome": "" },
+              this.__name + ": " + this.state.__err
+            ),
+            h(Placeholder, {
+              name: this.__name,
+              hintSize: this.props.__hintSize,
+              error: this.state.__err
+            })
+          );
+        }
+        this.__reconcileLogic();
+        if (!r.tpl) {
+          return h(
+            "div",
+            hostBase,
+            h(Placeholder, { name: this.__name, hintSize: this.props.__hintSize })
+          );
+        }
+        const userProps = this.__userProps();
+        this.logic.props = userProps;
+        let vals = userProps;
+        let renderErr = r.logicError || this.__ctorError;
+        try {
+          vals = { ...userProps, ...this.logic.renderVals() || {} };
+        } catch (e) {
+          console.error(e);
+          renderErr = this.__name + ".renderVals(): " + (e instanceof Error && e.message ? e.message : String(e));
+        }
+        this.__streamingNow = !!(r.htmlStreaming || r.jsStreaming);
+        this.__htmlStreamingNow = !!r.htmlStreaming;
+        return h(
+          "div",
+          { ...hostBase, className: cls + (renderErr ? " sc-has-error" : "") },
+          renderErr && h(
+            "div",
+            { className: "sc-logic-error", "data-omelette-chrome": "" },
+            renderErr
+          ),
+          h(
+            AncestorContext.Provider,
+            { value: [...chain, this.__name] },
+            r.tpl(vals, this)
+          )
+        );
+      }
+    }
+    __publicField(StreamableComponent, "contextType", AncestorContext);
+    const named = /* @__PURE__ */ new Map();
+    function getDC(name) {
+      const hit = named.get(name);
+      if (hit) return hit;
+      function Dispatcher(p) {
+        const [, setTick] = React.useState(0);
+        React.useEffect(() => {
+          const sub = () => setTick((n) => n + 1);
+          registry.get(name).subs.add(sub);
+          return () => {
+            registry.get(name).subs.delete(sub);
+          };
+        }, []);
+        ensureFetched(name);
+        return h(StreamableComponent, { ...p, __name: name });
+      }
+      Dispatcher.displayName = name;
+      named.set(name, Dispatcher);
+      return Dispatcher;
+    }
+    return {
+      getDC,
+      StreamableComponent
+    };
+  }
+
+  // src/bundled.ts
+  function bundledBlob(url) {
+    const blobs = window.__resourceBlobs;
+    const b = blobs ? blobs[url.split("#")[0]] : void 0;
+    return b instanceof Blob ? b : null;
+  }
+
+  // src/cdn.ts
+  var REACT_URL = "https://unpkg.com/react@18.3.1/umd/react.production.min.js";
+  var REACT_SRI = "sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z";
+  var REACT_DOM_URL = "https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js";
+  var REACT_DOM_SRI = "sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1";
+  var BABEL_URL = "https://unpkg.com/@babel/standalone@7.29.0/babel.min.js";
+  var BABEL_SRI = "sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y";
+  function cdnScriptFor(url, sri) {
+    const res = window.__resources;
+    const v = res ? res[url] : void 0;
+    return typeof v === "string" && v ? { src: v } : { src: url, integrity: sri };
+  }
+
+  // src/external.ts
+  var isCustomElementName = (n) => !n.includes(".") && n.includes("-");
+  function isRenderableType(g) {
+    if (typeof g === "function") return !isElementClass(g);
+    return typeof g === "object" && g !== null && typeof g.$$typeof === "symbol";
+  }
+  function resolveDottedPath(root, name) {
+    let cur = root;
+    for (const seg of name.split(".")) {
+      if (cur == null) return void 0;
+      cur = cur[seg];
+    }
+    return cur;
+  }
+  var GLOBAL_POLL_INTERVAL_MS = 50;
+  var GLOBAL_POLL_TIMEOUT_MS = 3e4;
+  function createExternalModules(onResolved) {
+    const cache = /* @__PURE__ */ new Map();
+    let babelLoading = null;
+    const reportedMissing = /* @__PURE__ */ new Map();
+    const polling = /* @__PURE__ */ new Set();
+    function ensureBabel() {
+      if (window.Babel) return Promise.resolve();
+      if (babelLoading) return babelLoading;
+      const babel = cdnScriptFor(BABEL_URL, BABEL_SRI);
+      babelLoading = new Promise((res, rej) => {
+        const s = document.createElement("script");
+        s.src = babel.src;
+        if (babel.integrity) {
+          s.integrity = babel.integrity;
+          s.crossOrigin = "anonymous";
+        }
+        s.onload = () => res();
+        s.onerror = rej;
+        document.head.appendChild(s);
+      });
+      return babelLoading;
+    }
+    const pending = /* @__PURE__ */ new Map();
+    function load(kind, url, after) {
+      const existing = pending.get(url);
+      if (existing) return existing;
+      cache.set(url, null);
+      console.info("[dc-runtime] x-import: loading", url, "(" + kind + ")");
+      const ready = Promise.all([
+        kind === "jsx" ? ensureBabel() : Promise.resolve(),
+        after ?? Promise.resolve()
+      ]);
+      const p = ready.then(() => {
+        const pre = bundledBlob(url);
+        if (pre) return pre.text();
+        return fetch(url).then((r) => {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.text();
+        });
+      }).then((src) => {
+        const code = kind === "jsx" ? window.Babel.transform(src, {
+          filename: url,
+          presets: ["react", "typescript"]
+        }).code : src;
+        const module = { exports: {} };
+        const before = new Set(Object.keys(window));
+        //! nosemgrep: eval-and-function-constructor
+        new Function("React", "module", "exports", "require", code)(
+          getReact(),
+          module,
+          module.exports,
+          () => ({})
+        );
+        const globals = {};
+        for (const k of Object.keys(window)) {
+          if (!before.has(k) && typeof window[k] === "function") {
+            globals[k] = window[k];
+          }
+        }
+        cache.set(url, { mod: module.exports, globals });
+        console.info(
+          "[dc-runtime] x-import: loaded",
+          url,
+          "\u2014 exports:",
+          Object.keys(module.exports),
+          "window globals:",
+          Object.keys(globals)
+        );
+        onResolved();
+      }).catch((e) => {
+        cache.set(url, {
+          mod: {},
+          globals: {},
+          error: "failed to load: " + (e instanceof Error && e.message ? e.message : String(e))
+        });
+        console.error(
+          "[dc-runtime] x-import: FAILED to load",
+          url,
+          "(" + kind + ")",
+          e
+        );
+        onResolved();
+      });
+      pending.set(url, p);
+      return p;
+    }
+    function resolve2(url, name) {
+      const entry = cache.get(url);
+      if (!entry) return null;
+      const { mod, globals } = entry;
+      const C = mod && mod[name] || globals && globals[name] || typeof window !== "undefined" && window[name] || mod && mod.default;
+      if (typeof C === "function") return C;
+      const key = url + "\0" + name;
+      if (!reportedMissing.has(key)) {
+        reportedMissing.set(
+          key,
+          entry.error || 'no export named "' + name + '" (has: ' + Object.keys(mod).join(", ") + ")"
+        );
+        console.error(
+          "[dc-runtime] x-import: module",
+          url,
+          "loaded but has no component named",
+          JSON.stringify(name),
+          "\u2014 available exports:",
+          Object.keys(mod),
+          "window globals:",
+          Object.keys(globals),
+          ". The module must `module.exports = {" + name + "}` or set `window." + name + "`."
+        );
+      }
+      return null;
+    }
+    function waitForGlobal(name) {
+      if (polling.has(name)) return;
+      polling.add(name);
+      const started = Date.now();
+      const isCE = isCustomElementName(name);
+      const tick = () => {
+        const found = isCE ? customElements.get(name) : isRenderableType(resolveDottedPath(window, name));
+        if (found) {
+          polling.delete(name);
+          onResolved();
+          return;
+        }
+        if (Date.now() - started >= GLOBAL_POLL_TIMEOUT_MS) {
+          console.warn(
+            "[dc-runtime] x-import: global",
+            JSON.stringify(name),
+            "never appeared on window after " + GLOBAL_POLL_TIMEOUT_MS + "ms"
+          );
+          return;
+        }
+        setTimeout(tick, GLOBAL_POLL_INTERVAL_MS);
+      };
+      setTimeout(tick, GLOBAL_POLL_INTERVAL_MS);
+    }
+    function resolveGlobal(url, name) {
+      const isCE = isCustomElementName(name);
+      if (!url) {
+        if (isCE) {
+          if (customElements.get(name)) return name;
+          waitForGlobal(name);
+          return null;
+        }
+        const g2 = resolveDottedPath(window, name);
+        if (isRenderableType(g2)) return g2;
+        waitForGlobal(name);
+        return null;
+      }
+      const entry = cache.get(url);
+      if (!entry) return null;
+      if (isCE && customElements.get(name)) return name;
+      const g = entry.globals[name] ?? resolveDottedPath(window, name);
+      if (isRenderableType(g)) return g;
+      if (name.includes(".")) return null;
+      const key = url + "\0global\0" + name;
+      if (!reportedMissing.has(key)) {
+        reportedMissing.set(key, null);
+        if (isCE && !customElements.get(name)) {
+          console.warn(
+            "[dc-runtime] x-import:",
+            url,
+            "loaded but no custom element",
+            JSON.stringify(name),
+            "is registered and window." + name + " is not a function \u2014 rendering <" + name + "> as an unknown element."
+          );
+        }
+      }
+      return name;
+    }
+    function getError(url, name) {
+      const entry = cache.get(url);
+      if (entry?.error) return entry.error;
+      return reportedMissing.get(url + "\0" + name) || null;
+    }
+    return { load, resolve: resolve2, resolveGlobal, getError };
+  }
+  function isElementClass(g) {
+    try {
+      return typeof g === "function" && typeof HTMLElement !== "undefined" && g.prototype instanceof HTMLElement;
+    } catch {
+      return false;
+    }
+  }
+
+  // src/atomics.ts
+  var ATOMIC_CSS = (
+    // layout
+    ".fx{display:flex}.col{display:flex;flex-direction:column}.grid{display:grid}.ac{align-items:center}.jc{justify-content:center}.jb{justify-content:space-between}.f1{flex:1}.noshrink{flex-shrink:0}.wrap{flex-wrap:wrap}.fw5{font-weight:500}.fw6{font-weight:600}.fw7{font-weight:700}.fw8{font-weight:800}.fs11{font-size:11px}.fs12{font-size:12px}.fs13{font-size:13px}.fs14{font-size:14px}.fs15{font-size:15px}.fs16{font-size:16px}.fs20{font-size:20px}.fs22{font-size:22px}.upper{text-transform:uppercase}.tc{text-align:center}.nowrap{white-space:nowrap}.gap8{gap:8px}.gap10{gap:10px}.gap12{gap:12px}.gap16{gap:16px}.gap24{gap:24px}.m0{margin:0}.mt8{margin-top:8px}.mt12{margin-top:12px}.mt16{margin-top:16px}.mb8{margin-bottom:8px}.mb12{margin-bottom:12px}.mb16{margin-bottom:16px}.posrel{position:relative}.posabs{position:absolute}.round{border-radius:50%}.ohide{overflow:hidden}.bbox{box-sizing:border-box}.pointer{cursor:pointer}.w100{width:100%}.b0{border:none}"
+  );
+
+  // src/helmet.ts
+  var DESIGN_DOC_MODE_RE = /<meta\b[^>]*\bname\s*=\s*["']design_doc_mode["'][^>]*\b(?:content|value)\s*=\s*["'](\w+)["']/i;
+  var CANVAS_BG_LIGHT = "#f0eee6";
+  var CANVAS_BG_DARK = "#2e2c26";
+  function createHelmetManager(doc, isStreaming) {
+    const mounted = /* @__PURE__ */ new Set();
+    const live = /* @__PURE__ */ new Map();
+    let designDocMode = null;
+    let canvasStyleEl = null;
+    let appTheme = "light";
+    try {
+      const ds = doc.documentElement.dataset.theme;
+      appTheme = ds === "dark" || ds === "light" ? ds : new URLSearchParams(doc.defaultView?.location.search ?? "").get(
+        "theme"
+      ) === "dark" ? "dark" : "light";
+    } catch {
+    }
+    function applyCanvasBg() {
+      if (!canvasStyleEl) return;
+      const bg = appTheme === "dark" ? CANVAS_BG_DARK : CANVAS_BG_LIGHT;
+      canvasStyleEl.textContent = `html,body{background:${bg}}#dc-root>.sc-host{position:relative}`;
+    }
+    function postDesignMode(mode) {
+      if (window.parent === window) return;
+      try {
+        window.parent.postMessage({ type: "__dc_design_mode", mode }, "*");
+      } catch {
+      }
+    }
+    function setDesignDocMode(mode) {
+      if (mode === designDocMode) return;
+      designDocMode = mode;
+      postDesignMode(mode);
+      if (mode === "canvas") {
+        doc.documentElement.setAttribute("data-dc-canvas", "");
+        canvasStyleEl = doc.createElement("style");
+        canvasStyleEl.setAttribute("data-dc-canvas", "");
+        applyCanvasBg();
+        doc.head.appendChild(canvasStyleEl);
+      } else {
+        doc.documentElement.removeAttribute("data-dc-canvas");
+        canvasStyleEl?.remove();
+        canvasStyleEl = null;
+      }
+    }
+    window.addEventListener("message", (e) => {
+      const type = e.data && e.data.type;
+      if (type === "__dc_theme") {
+        const t = e.data.theme;
+        if (t === "light" || t === "dark") {
+          appTheme = t;
+          applyCanvasBg();
+        }
+        return;
+      }
+      if (!designDocMode || type !== "__dc_probe") return;
+      postDesignMode(designDocMode);
+    });
+    function compile(node) {
+      const raw = [...node.children];
+      const helmetClosed = node.nextSibling != null || node.parentNode?.nextSibling != null;
+      if (node.hasAttribute("data-dc-atomics") && !mounted.has("__dc-atomics")) {
+        mounted.add("__dc-atomics");
+        const el = doc.createElement("style");
+        el.id = "__dc-atomics";
+        el.textContent = ATOMIC_CSS;
+        doc.head.appendChild(el);
+      }
+      return (_vals, ctx) => {
+        const name = ctx && ctx.__name || "";
+        const streaming = !!(name && isStreaming(name));
+        for (let i = 0; i < raw.length; i++) {
+          const child = raw[i];
+          const tag = child.tagName;
+          const mayBePartial = streaming && !helmetClosed && i === raw.length - 1;
+          if (tag === "SCRIPT") {
+            if (mayBePartial) continue;
+            const key = "SCRIPT|" + (child.getAttribute("src") || child.textContent || "");
+            if (mounted.has(key)) continue;
+            mounted.add(key);
+            const el = doc.createElement("script");
+            for (const { name: an, value } of [...child.attributes])
+              el.setAttribute(an, value);
+            if (child.textContent) el.textContent = child.textContent;
+            doc.head.appendChild(el);
+          } else if (tag === "LINK" || tag === "META") {
+            if (mayBePartial) continue;
+            const key = tag + "|" + (child.getAttribute("href") || child.getAttribute("src") || child.outerHTML);
+            if (mounted.has(key)) continue;
+            mounted.add(key);
+            if (tag === "LINK") {
+              const rel = (child.getAttribute("rel") || "").toLowerCase().split(/\s+/);
+              const href = (child.getAttribute("href") || "").trim();
+              const res = window.__resources;
+              const pre = res && rel.includes("stylesheet") && !rel.includes("alternate") ? res[href] : void 0;
+              const blob = typeof pre === "string" && pre ? bundledBlob(pre) : null;
+              if (blob) {
+                const el = doc.createElement("style");
+                if (child.hasAttribute("disabled")) {
+                  el.setAttribute("media", "not all");
+                } else if (child.getAttribute("media")) {
+                  el.setAttribute("media", child.getAttribute("media"));
+                }
+                if (child.getAttribute("title"))
+                  el.setAttribute("title", child.getAttribute("title"));
+                void blob.text().then((css) => {
+                  el.textContent = css;
+                });
+                doc.head.appendChild(el);
+                continue;
+              }
+            }
+            doc.head.appendChild(child.cloneNode(true));
+          } else {
+            const key = name + "|" + i;
+            let el = live.get(key);
+            if (!el || el.tagName !== tag) {
+              if (el) el.remove();
+              el = doc.createElement(tag.toLowerCase());
+              live.set(key, el);
+              doc.head.appendChild(el);
+            }
+            for (const { name: an, value } of [...child.attributes]) {
+              if (el.getAttribute(an) !== value) el.setAttribute(an, value);
+            }
+            if (el.textContent !== child.textContent)
+              el.textContent = child.textContent;
+          }
+        }
+        return null;
+      };
+    }
+    return { compile, setDesignDocMode };
+  }
+
+  // src/pseudo.ts
+  function scanUnquotedUrl(css, i) {
+    if (css[i] !== "u" && css[i] !== "U" || css.slice(i, i + 4).toLowerCase() !== "url(" || /[a-z0-9_-]/i.test(css[i - 1] ?? "")) {
+      return -1;
+    }
+    let j = i + 4;
+    while (j < css.length && /\s/.test(css[j])) j++;
+    if (css[j] === '"' || css[j] === "'") return -1;
+    while (j < css.length && css[j] !== ")") {
+      if (css[j] === "\\") j++;
+      j++;
+    }
+    return j < css.length ? j + 1 : css.length;
+  }
+  function stripComments(css) {
+    let out = "";
+    let quote = "";
+    for (let i = 0; i < css.length; i++) {
+      const c = css[i];
+      if (quote) {
+        if (c === "\\") {
+          out += c + (css[i + 1] ?? "");
+          i++;
+          continue;
+        }
+        if (c === quote) quote = "";
+        out += c;
+      } else if (c === "'" || c === '"') {
+        quote = c;
+        out += c;
+      } else if (c === "/" && css[i + 1] === "*") {
+        const end = css.indexOf("*/", i + 2);
+        i = end === -1 ? css.length : end + 1;
+        out += " ";
+      } else {
+        const end = scanUnquotedUrl(css, i);
+        if (end === -1) out += c;
+        else {
+          out += css.slice(i, end);
+          i = end - 1;
+        }
+      }
+    }
+    return out;
+  }
+  function importantify(css) {
+    css = stripComments(css);
+    const decls = [];
+    let start = 0;
+    let depth = 0;
+    let quote = "";
+    for (let i = 0; i < css.length; i++) {
+      const c = css[i];
+      if (quote) {
+        if (c === "\\") i++;
+        else if (c === quote) quote = "";
+      } else if (c === "'" || c === '"') quote = c;
+      else if (c === "(") depth++;
+      else if (c === ")") depth = Math.max(0, depth - 1);
+      else if (c === ";" && depth === 0) {
+        decls.push(css.slice(start, i));
+        start = i + 1;
+      } else {
+        const end = scanUnquotedUrl(css, i);
+        if (end !== -1) i = end - 1;
+      }
+    }
+    decls.push(css.slice(start));
+    return decls.map((d) => d.trim()).filter(Boolean).map((d) => /!\s*important$/i.test(d) ? d : d + " !important").join(";");
+  }
+  function createPseudoSheet(doc) {
+    let el = null;
+    const cache = /* @__PURE__ */ new Map();
+    let n = 0;
+    return (pseudo, css) => {
+      const k = pseudo + "|" + css;
+      const hit = cache.get(k);
+      if (hit) return hit;
+      if (!el) {
+        el = doc.createElement("style");
+        doc.head.appendChild(el);
+      }
+      const cls = "scp" + (n++).toString(36);
+      const isPseudoElement = pseudo === "before" || pseudo === "after";
+      const sel = isPseudoElement ? "." + cls + "::" + pseudo : "." + cls + ":" + pseudo;
+      el.sheet.insertRule(
+        sel + "{" + (isPseudoElement ? css : importantify(css)) + "}",
+        el.sheet.cssRules.length
+      );
+      cache.set(k, cls);
+      return cls;
+    };
+  }
+
+  // src/registry.ts
+  function createRegistry() {
+    const entries = /* @__PURE__ */ Object.create(null);
+    function get(name) {
+      return entries[name] || (entries[name] = {
+        html: "",
+        tpl: null,
+        Logic: null,
+        jsStreaming: false,
+        htmlStreaming: false,
+        ver: 0,
+        subs: /* @__PURE__ */ new Set(),
+        fetched: false
+      });
+    }
+    function bump(name) {
+      const r = get(name);
+      r.ver++;
+      for (const fn of r.subs) fn();
+    }
+    return {
+      entries,
+      get,
+      bump,
+      bumpAll() {
+        for (const n in entries) bump(n);
+      }
+    };
+  }
+
+  // src/runtime.ts
+  var COMPONENT_DIR = ".";
+  function createRuntime(doc = document) {
+    const registry = createRegistry();
+    const pseudoClass = createPseudoSheet(doc);
+    const helmet = createHelmetManager(
+      doc,
+      (name) => registry.get(name).htmlStreaming
+    );
+    const external = createExternalModules(() => registry.bumpAll());
+    const factory = createComponentFactory(registry, ensureFetched);
+    const host = {
+      component: (name) => factory.getDC(name),
+      placeholder: (props) => h(Placeholder, props),
+      helmet: (node) => helmet.compile(node),
+      loadExternal: (kind, url, after) => external.load(kind, url, after),
+      resolveExternal: (url, name) => external.resolve(url, name),
+      resolveExternalGlobal: (url, name) => external.resolveGlobal(url, name),
+      resolveExternalError: (url, name) => external.getError(url, name),
+      pseudoClass
+    };
+    function ensureFetched(name) {
+      const r = registry.get(name);
+      if (r.fetched) return;
+      r.fetched = true;
+      const url = COMPONENT_DIR + "/" + encodeURIComponent(name) + ".dc.html";
+      const res = window.__resources;
+      const pre = res ? res[url] : void 0;
+      const target = typeof pre === "string" && pre ? pre : url;
+      const blob = bundledBlob(target);
+      (blob ? blob.text() : fetch(target).then((res2) => {
+        if (!res2.ok) {
+          console.error(
+            '[dc-runtime] sibling fetch for "' + name + '" failed:',
+            url,
+            "returned",
+            res2.status,
+            "\u2014 the reference renders as an empty placeholder."
+          );
+          return "";
+        }
+        return res2.text();
+      })).then((t) => {
+        if (!t) return;
+        const parsed = parseDcText(t);
+        if (!parsed) {
+          console.error(
+            '[dc-runtime] sibling fetch for "' + name + '":',
+            url,
+            "has no <x-dc> block \u2014 not a Design Component."
+          );
+          return;
+        }
+        if (parsed.props) r.propsMeta = parsed.props;
+        if (parsed.preview) r.preview = parsed.preview;
+        if (parsed.template && !r.html) updateHtml(name, parsed.template);
+        if (parsed.js && !r.Logic) updateJs(name, parsed.js);
+      }).catch(
+        (e) => console.error(
+          '[dc-runtime] sibling fetch for "' + name + '" threw:',
+          url,
+          e
+        )
+      );
+    }
+    let rootName = null;
+    function updateHtml(name, html) {
+      const r = registry.get(name);
+      r.html = html;
+      if (name === rootName) {
+        const mode = DESIGN_DOC_MODE_RE.exec(html)?.[1] ?? null;
+        if (mode || !r.htmlStreaming) helmet.setDesignDocMode(mode);
+      }
+      try {
+        r.tpl = compileTemplate(html, host);
+      } catch (e) {
+        console.error("[dc-runtime] template compile FAILED for", name, e);
+      }
+      registry.bump(name);
+    }
+    function updateJs(name, src) {
+      const r = registry.get(name);
+      const seq = r.jsSeq = (r.jsSeq || 0) + 1;
+      try {
+        const Cls = evalDcLogic(src);
+        if (r.jsSeq !== seq) return;
+        if (typeof Cls !== "function") {
+          r.logicError = name + ".dc.html: <script data-dc-script> must define `class Component extends DCLogic`";
+        } else {
+          r.logicError = null;
+          r.Logic = Cls;
+        }
+      } catch (e) {
+        if (r.jsSeq !== seq) return;
+        console.error(
+          "[dc-runtime] logic class eval FAILED for",
+          name,
+          "\u2014 the template renders with props only.",
+          e
+        );
+        r.logicError = name + ": " + (e instanceof Error && e.message ? e.message : String(e));
+      }
+      registry.bump(name);
+    }
+    function setStreaming(name, kind, on) {
+      const r = registry.get(name);
+      if (kind === "html") r.htmlStreaming = !!on;
+      else r.jsStreaming = !!on;
+      let any = false;
+      for (const n in registry.entries) {
+        const e = registry.entries[n];
+        if (e && (e.htmlStreaming || e.jsStreaming)) {
+          any = true;
+          break;
+        }
+      }
+      doc.documentElement.classList.toggle("sc-dc-streaming", any);
+      registry.bump(name);
+    }
+    function dcUpdate(name, kind, content, streaming) {
+      if (streaming) registry.get(name).fetched = true;
+      if (kind === "html") {
+        setStreaming(name, "html", !!streaming);
+        updateHtml(name, content);
+      } else if (kind === "js") {
+        setStreaming(name, "js", !!streaming);
+        if (!streaming) updateJs(name, content);
+      } else if (kind === "props") {
+        const { props, preview } = parseDataProps(content);
+        const r = registry.get(name);
+        r.propsMeta = props ?? void 0;
+        r.preview = preview;
+        registry.bump(name);
+      }
+    }
+    function setProps(name, overrides) {
+      registry.get(name).propOverrides = overrides && typeof overrides === "object" ? { ...overrides } : null;
+      registry.bump(name);
+    }
+    function adoptParsed(name, parsed) {
+      if (!parsed) return;
+      const r = registry.get(name);
+      if (parsed.props) r.propsMeta = parsed.props;
+      if (parsed.preview) r.preview = parsed.preview;
+      if (parsed.template) updateHtml(name, parsed.template);
+      if (parsed.js) updateJs(name, parsed.js);
+    }
+    return {
+      registry,
+      getDC: factory.getDC,
+      updateHtml,
+      updateJs,
+      dcUpdate,
+      setProps,
+      adoptParsed,
+      setRootName: (name) => {
+        rootName = name;
+      },
+      markFetched: (name) => {
+        registry.get(name).fetched = true;
+      },
+      annotatedTemplate: (name) => {
+        const r = registry.get(name);
+        return r.tpl && r.tpl.__annotated || null;
+      },
+      templateSource: (name) => registry.get(name).html || null,
+      StreamableLogic
+    };
+  }
+
+  // src/stream-state.ts
+  function createStreamTracker(staleMs = 6e4, now = Date.now) {
+    const since = /* @__PURE__ */ new Map();
+    const liveOne = (n) => {
+      const t = since.get(n);
+      if (t === void 0) return false;
+      if (now() - t > staleMs) {
+        since.delete(n);
+        return false;
+      }
+      return true;
+    };
+    return {
+      push(name, streaming, viewportKey) {
+        if (viewportKey === "dc-model") return;
+        if (streaming) since.set(name, now());
+        else since.delete(name);
+      },
+      live(name) {
+        if (name !== void 0) return liveOne(name);
+        for (const n of [...since.keys()]) if (liveOne(n)) return true;
+        return false;
+      }
+    };
+  }
+
+  // src/index.ts
+  function hideRawTemplate() {
+    const s = document.createElement("style");
+    s.textContent = "x-dc{display:none!important}";
+    document.head.appendChild(s);
+  }
+  function loadScript(src, integrity) {
+    return new Promise((resolve2, reject) => {
+      //! nosemgrep: create-script-element
+      const s = document.createElement("script");
+      s.src = src;
+      if (integrity) {
+        s.integrity = integrity;
+        s.crossOrigin = "anonymous";
+      }
+      s.async = false;
+      s.onload = () => resolve2();
+      s.onerror = () => reject(new Error(`failed to load ${src}`));
+      document.head.appendChild(s);
+    });
+  }
+  function loadReactUmd() {
+    const w = window;
+    if (w.React && w.ReactDOM) return Promise.resolve();
+    const react = cdnScriptFor(REACT_URL, REACT_SRI);
+    const reactDom = cdnScriptFor(REACT_DOM_URL, REACT_DOM_SRI);
+    return Promise.all([
+      loadScript(react.src, react.integrity),
+      loadScript(reactDom.src, reactDom.integrity)
+    ]).then(() => void 0);
+  }
+  function init() {
+    const runtime = createRuntime(document);
+    let rootName = "Root";
+    const baseCss = document.createElement("style");
+    baseCss.textContent = BASE_CSS;
+    document.head.prepend(baseCss);
+    const notifyHost = () => {
+      if (window.parent === window) return;
+      const r = runtime.registry.entries[rootName];
+      try {
+        window.parent.postMessage(
+          {
+            type: "__dc_booted",
+            rootName,
+            propsMeta: r && r.propsMeta || null,
+            preview: r && r.preview || null
+          },
+          "*"
+        );
+      } catch {
+      }
+    };
+    const streams = createStreamTracker();
+    const api = {
+      __dcUpdate: (name, kind, content, streaming, viewportKey) => {
+        streams.push(name, streaming, viewportKey);
+        runtime.dcUpdate(name, kind, content, streaming);
+        if (name === rootName && !streaming && kind === "props") notifyHost();
+      },
+      __dcStreaming: (name) => streams.live(name),
+      __dcSetProps: (name, overrides) => runtime.setProps(name, overrides),
+      /** Name of the component currently mounted as the page root — DC tools
+       *  push their template-stream here when targeting "the open page". */
+      __dcRootName: () => rootName,
+      /** Editor bridge — the encoded, `data-dc-tpl`-annotated template source.
+       *  The host editor parses this into its own template DOM so it can map a
+       *  rendered node (carrying the same `data-dc-tpl`) back to the source
+       *  node that emitted it. Returns the encoded form (`sc-camel-*` attrs,
+       *  `<sc-raw-*>`/`<sc-helmet>` tags); the editor decodes on serialize. */
+      __dcAnnotatedTemplate: (name) => runtime.annotatedTemplate(name),
+      /** Editor bridge — the *original* (decoded) template source. */
+      __dcTemplateSource: (name) => runtime.templateSource(name),
+      __dcBoot: () => {
+        rootName = boot(runtime, document) ?? rootName;
+        notifyHost();
+      },
+      __dcRegistry: runtime.registry.entries,
+      getDC: (name) => runtime.getDC(name),
+      // `DCLogic` is the documented base class name; `StreamableLogic` is the
+      // implementation alias kept for any project that already references it.
+      DCLogic: runtime.StreamableLogic,
+      StreamableLogic: runtime.StreamableLogic
+    };
+    Object.assign(window, api);
+    window.__dcContentKeyed = true;
+    if (document.readyState !== "loading") api.__dcBoot();
+    else document.addEventListener("DOMContentLoaded", () => api.__dcBoot());
+  }
+  hideRawTemplate();
+  loadReactUmd().then(init).catch((err) => {
+    console.error("[dc] failed to load React or boot:", err);
+    throw err;
+  });
+})();
+
+</script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  body{margin:0;background:oklch(0.985 0.003 255);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;color:oklch(0.22 0.015 255);}
+  a{color:oklch(0.4 0.1 255);text-decoration:none;}
+  a:hover{color:oklch(0.3 0.1 255);text-decoration:underline;}
+  input,select{font-family:inherit;}
+  input::placeholder{color:oklch(0.65 0.01 255);}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:oklch(0.85 0.01 255);border-radius:4px;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+</style>
+</helmet>
+<div style="display:flex;min-height:100vh;width:100%;">
+
+  <div style="width:220px;flex-shrink:0;background:oklch(0.19 0.035 255);display:flex;flex-direction:column;padding:20px 0;">
+    <div style="padding:0 20px 20px 20px;border-bottom:1px solid oklch(0.3 0.04 255 / 0.5);margin-bottom:12px;">
+      <div style="font-size:17px;font-weight:700;color:#fff;letter-spacing:0.2px;">QuantaBuild</div>
+      <div style="font-size:11px;color:oklch(0.7 0.02 255);margin-top:2px;">Material &amp; Pakyaw Estimator</div>
+    </div>
+    <sc-for list="{{ navItems }}" as="item" hint-placeholder-count="6">
+      <div onClick="{{ item.onClick }}" style="{{ item.style }}">
+        <div style="width:6px;height:6px;border-radius:50%;background:{{ item.dotColor }};flex-shrink:0;"></div>
+        <div style="font-size:14px;font-weight:{{ item.weight }};">{{ item.label }}</div>
+      </div>
+    </sc-for>
+    <div style="margin-top:auto;padding:14px 20px;border-top:1px solid oklch(0.3 0.04 255 / 0.5);">
+      <div style="font-size:11px;color:oklch(0.65 0.02 255);">Logged in as</div>
+      <div style="font-size:13px;color:#fff;font-weight:600;margin-top:2px;">J. Santos, QS</div>
+    </div>
+  </div>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+
+    <div style="height:56px;flex-shrink:0;background:#fff;border-bottom:1px solid oklch(0.89 0.01 255);display:flex;align-items:center;justify-content:space-between;padding:0 28px;">
+      <div style="font-size:15px;font-weight:600;">{{ screenTitle }}</div>
+      <div style="display:flex;align-items:center;gap:18px;">
+        <div onClick="{{ syncNow }}" style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:oklch(0.5 0.02 255);cursor:pointer;" title="Click to sync now">
+          <div style="{{ syncDotStyle }}"></div>
+          {{ syncStatusLabel }}
+        </div>
+        <div style="width:1px;height:20px;background:oklch(0.89 0.01 255);"></div>
+        <div style="width:32px;height:32px;border-radius:50%;background:oklch(0.94 0.02 255);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:oklch(0.28 0.06 255);">JS</div>
+      </div>
+    </div>
+
+    <sc-if value="{{ isConflict }}" hint-placeholder-val="{{ false }}">
+      <div style="background:oklch(0.97 0.03 25);border-bottom:1px solid oklch(0.85 0.1 25);padding:10px 28px;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:oklch(0.4 0.15 25);">
+        <div>⚠ This project changed on the server since you last loaded it — saving is paused to avoid overwriting that change.</div>
+        <div onClick="{{ reloadLatest }}" style="background:oklch(0.5 0.15 25);color:#fff;font-weight:700;padding:7px 14px;border-radius:6px;cursor:pointer;">Reload Latest Version</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ projectLoading }}" hint-placeholder-val="{{ false }}">
+      <div style="background:oklch(0.97 0.02 255);border-bottom:1px solid oklch(0.88 0.03 255);padding:10px 28px;font-size:13px;color:oklch(0.4 0.08 255);display:flex;align-items:center;gap:8px;">
+        <div style="width:7px;height:7px;border-radius:50%;background:oklch(0.55 0.12 255);animation:pulse 1s infinite;"></div>
+        Loading project from Google Sheets… edits are paused until it arrives.
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ hasLoadError }}" hint-placeholder-val="{{ false }}">
+      <div style="background:oklch(0.97 0.03 70);border-bottom:1px solid oklch(0.85 0.08 70);padding:10px 28px;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:oklch(0.42 0.1 70);">
+        <div>⚠ Could not load this project from Google Sheets ({{ loadError }}). Showing the last local copy, if any.</div>
+        <div onClick="{{ dismissLoadError }}" style="font-weight:700;cursor:pointer;padding:4px 8px;">Dismiss</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ noProject }}" hint-placeholder-val="{{ false }}">
+      <div style="background:oklch(0.97 0.01 255);border-bottom:1px solid oklch(0.9 0.01 255);padding:10px 28px;font-size:13px;color:oklch(0.45 0.02 255);">No project is open. Create one under Projects → "+ New Project" — nothing is saved until you do.</div>
+    </sc-if>
+
+    <div style="flex:1;overflow:auto;padding:28px;">
+
+      <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ true }}">
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;">
+          <div>
+            <div style="font-size:22px;font-weight:700;">Dashboard</div>
+            <div style="font-size:13px;color:oklch(0.5 0.02 255);margin-top:3px;">Overview of all active projects and estimates.</div>
+          </div>
+          <div onClick="{{ goEstimator }}" style="background:oklch(0.28 0.06 255);color:#fff;font-size:13.5px;font-weight:600;padding:10px 18px;border-radius:7px;cursor:pointer;">+ New Estimate</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:24px;">
+          <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+            <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;padding:18px;min-width:0;">
+              <div style="font-size:12px;color:oklch(0.52 0.02 255);font-weight:600;text-transform:uppercase;letter-spacing:0.4px;">{{ k.label }}</div>
+              <div style="font-size:21px;font-weight:700;margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ k.value }}">{{ k.value }}</div>
+              <div style="font-size:12px;margin-top:6px;color:{{ k.subColor }};">{{ k.sub }}</div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;overflow:hidden;">
+          <div style="padding:16px 20px;border-bottom:1px solid oklch(0.93 0.01 255);font-size:14.5px;font-weight:700;">Recent Projects</div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:oklch(0.98 0.004 255);">
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Project</th>
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Type</th>
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Status</th>
+                <th style="text-align:right;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Est. Value</th>
+                <th style="text-align:right;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ recentProjects }}" as="rp" hint-placeholder-count="5">
+                <tr style="border-top:1px solid oklch(0.94 0.01 255);">
+                  <td style="padding:12px 20px;font-weight:600;">{{ rp.name }}</td>
+                  <td style="padding:12px 20px;color:oklch(0.5 0.02 255);">{{ rp.type }}</td>
+                  <td style="padding:12px 20px;"><span style="{{ rp.badgeStyle }}">{{ rp.status }}</span></td>
+                  <td style="padding:12px 20px;text-align:right;font-weight:600;">{{ rp.value }}</td>
+                  <td style="padding:12px 20px;text-align:right;color:oklch(0.55 0.02 255);">{{ rp.updated }}</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isProjects }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+          <div style="font-size:22px;font-weight:700;">Projects</div>
+          <div onClick="{{ createNewProject }}" style="background:oklch(0.28 0.06 255);color:#fff;font-size:13.5px;font-weight:600;padding:10px 18px;border-radius:7px;cursor:pointer;">+ New Project</div>
+        </div>
+        <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;overflow:hidden;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:oklch(0.98 0.004 255);">
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Project</th>
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Owner</th>
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Location</th>
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Status</th>
+                <th style="text-align:right;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Est. Value</th>
+                <th style="text-align:right;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11.5px;text-transform:uppercase;">Revisions</th>
+                <th style="padding:10px 20px;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ projectsList }}" as="p" hint-placeholder-count="6">
+                <tr onClick="{{ p.open }}" style="{{ p.rowStyle }}">
+                  <td style="padding:12px 20px;font-weight:600;">{{ p.name }}{{ p.currentTag }}</td>
+                  <td style="padding:12px 20px;color:oklch(0.5 0.02 255);">{{ p.owner }}</td>
+                  <td style="padding:12px 20px;color:oklch(0.5 0.02 255);">{{ p.location }}</td>
+                  <td style="padding:12px 20px;"><span style="{{ p.badgeStyle }}">{{ p.status }}</span></td>
+                  <td style="padding:12px 20px;text-align:right;font-weight:600;">{{ p.value }}</td>
+                  <td style="padding:12px 20px;text-align:right;color:oklch(0.55 0.02 255);">{{ p.revisions }}</td>
+                  <td style="padding:12px 20px;text-align:right;"><span onClick="{{ p.remove }}" style="cursor:pointer;color:oklch(0.58 0.18 25);font-size:12px;font-weight:600;">Delete</span></td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="margin-top:14px;">
+          <div onClick="{{ toggleTrash }}" style="font-size:12.5px;font-weight:600;color:oklch(0.5 0.02 255);cursor:pointer;display:inline-block;">Trash / Deleted Projects ▾</div>
+          <sc-if value="{{ showTrash }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;margin-top:10px;overflow:hidden;">
+              <sc-for list="{{ trashedProjects }}" as="t" hint-placeholder-count="1">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-top:1px solid oklch(0.94 0.01 255);font-size:13px;">
+                  <div>{{ t.name }}</div>
+                  <span onClick="{{ t.restore }}" style="cursor:pointer;color:oklch(0.4 0.1 255);font-weight:600;font-size:12px;">Restore</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isEstimator }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <div style="margin-bottom:18px;">
+          <div style="font-size:22px;font-weight:700;">Material &amp; Labor Calculator</div>
+          <div style="font-size:13px;color:oklch(0.5 0.02 255);margin-top:3px;">Select a work item, enter dimensions, and review live quantities and cost.</div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
+          <sc-for list="{{ workTypeTabs }}" as="t" hint-placeholder-count="6">
+            <div onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</div>
+          </sc-for>
+        </div>
+
+        <div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,0.9fr);gap:20px;align-items:start;">
+
+          <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;padding:22px;">
+
+            <sc-if value="{{ isChb }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:14.5px;font-weight:700;margin-bottom:14px;">CHB Wall — Dimensions &amp; Specification</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                <div><label style="{{ labelStyle }}">Wall Length (m)</label><input type="number" placeholder="0.00" value="{{ f.length }}" onChange="{{ h.length }}" style="{{ inputStyle }}"/></div>
+                <div><label style="{{ labelStyle }}">Wall Height (m)</label><input type="number" placeholder="0.00" value="{{ f.height }}" onChange="{{ h.height }}" style="{{ inputStyle }}"/></div>
+              </div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">CHB Thickness</label>
+                <div style="display:flex;gap:8px;">
+                  <div onClick="{{ setThickness4 }}" style="{{ chbThickStyle4 }}">4 in</div>
+                  <div onClick="{{ setThickness6 }}" style="{{ chbThickStyle6 }}">6 in</div>
+                  <div onClick="{{ setThickness8 }}" style="{{ chbThickStyle8 }}">8 in</div>
+                </div>
+              </div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Total Opening Area to Deduct — doors/windows (sqm)</label><input type="number" placeholder="0.00" value="{{ f.openingsArea }}" onChange="{{ h.openingsArea }}" style="{{ inputStyle }}"/></div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Wastage Allowance (%)</label><input type="number" placeholder="5" value="{{ f.wastage }}" onChange="{{ h.wastage }}" style="{{ inputStyle }}"/></div>
+
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Editable Coefficients</div>
+                <div style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:oklch(0.55 0.02 255);background:oklch(0.98 0.004 255);padding:8px 10px;border-radius:6px;margin-bottom:12px;">Area = (L × H) − Openings &nbsp;·&nbsp; Qty = Area × Coefficient × (1 + Wastage)</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                  <div><label style="{{ labelStyle }}">Blocks / sqm</label><input type="number" value="{{ f.blockCoeff }}" onChange="{{ h.blockCoeff }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Cement bags / sqm</label><input type="number" value="{{ f.cementCoeff }}" onChange="{{ h.cementCoeff }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Sand cu.m / sqm</label><input type="number" value="{{ f.sandCoeff }}" onChange="{{ h.sandCoeff }}" style="{{ inputStyle }}"/></div>
+                </div>
+              </div>
+
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Material Prices</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                  <div><label style="{{ labelStyle }}">Block, ₱/pc</label><input type="number" placeholder="0.00" value="{{ f.blockPrice }}" onChange="{{ h.blockPrice }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Cement, ₱/bag</label><input type="number" placeholder="0.00" value="{{ f.cementPrice }}" onChange="{{ h.cementPrice }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Sand, ₱/cu.m</label><input type="number" placeholder="0.00" value="{{ f.sandPrice }}" onChange="{{ h.sandPrice }}" style="{{ inputStyle }}"/></div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isRebar }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:14.5px;font-weight:700;margin-bottom:14px;">Reinforcing Steel — Dimensions &amp; Specification</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                <div><label style="{{ labelStyle }}">Bar Diameter (mm)</label><input type="number" placeholder="10" value="{{ f.diameter }}" onChange="{{ h.diameter }}" style="{{ inputStyle }}"/></div>
+                <div><label style="{{ labelStyle }}">Total Cutting Length (lm)</label><input type="number" placeholder="0.00" value="{{ f.totalLength }}" onChange="{{ h.totalLength }}" style="{{ inputStyle }}"/></div>
+              </div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Wastage / Lap Allowance (%)</label><input type="number" placeholder="5" value="{{ f.wastage }}" onChange="{{ h.wastage }}" style="{{ inputStyle }}"/></div>
+
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Formula</div>
+                <div style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:oklch(0.55 0.02 255);background:oklch(0.98 0.004 255);padding:8px 10px;border-radius:6px;">Unit Weight (kg/m) = d² ÷ 162 &nbsp;·&nbsp; Material kg = Length × Unit Weight × (1 + Wastage) &nbsp;·&nbsp; Labor on net kg (or lm)</div>
+              </div>
+
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Material Price</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                  <div><label style="{{ labelStyle }}">Steel, ₱/kg</label><input type="number" placeholder="0.00" value="{{ f.unitPriceKg }}" onChange="{{ h.unitPriceKg }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Pakyaw Rate Basis</label>
+                    <div style="display:flex;gap:8px;">
+                      <div onClick="{{ setRateUnitKg }}" style="{{ rateUnitStyleKg }}">per kg</div>
+                      <div onClick="{{ setRateUnitLm }}" style="{{ rateUnitStyleLm }}">per lm</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isConcrete }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:14.5px;font-weight:700;margin-bottom:14px;">Concrete — Dimensions &amp; Mix Class</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+                <div><label style="{{ labelStyle }}">Length (m)</label><input type="number" placeholder="0.00" value="{{ f.length }}" onChange="{{ h.length }}" style="{{ inputStyle }}"/></div>
+                <div><label style="{{ labelStyle }}">Width (m)</label><input type="number" placeholder="0.00" value="{{ f.width }}" onChange="{{ h.width }}" style="{{ inputStyle }}"/></div>
+                <div><label style="{{ labelStyle }}">Thickness (m)</label><input type="number" placeholder="0.00" value="{{ f.thickness }}" onChange="{{ h.thickness }}" style="{{ inputStyle }}"/></div>
+              </div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Mix Class</label>
+                <div style="display:flex;gap:8px;">
+                  <div onClick="{{ setClassA }}" style="{{ classStyleA }}">Class A (1:2:4)</div>
+                  <div onClick="{{ setClassB }}" style="{{ classStyleB }}">Class B (1:2.5:5)</div>
+                  <div onClick="{{ setClassC }}" style="{{ classStyleC }}">Class C (1:3:6)</div>
+                </div>
+              </div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Wastage Allowance (%)</label><input type="number" placeholder="5" value="{{ f.wastage }}" onChange="{{ h.wastage }}" style="{{ inputStyle }}"/></div>
+
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Editable Coefficients (per cu.m)</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                  <div><label style="{{ labelStyle }}">Cement, bags</label><input type="number" value="{{ f.cementCoeff }}" onChange="{{ h.cementCoeff }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Sand, cu.m</label><input type="number" value="{{ f.sandCoeff }}" onChange="{{ h.sandCoeff }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Gravel, cu.m</label><input type="number" value="{{ f.gravelCoeff }}" onChange="{{ h.gravelCoeff }}" style="{{ inputStyle }}"/></div>
+                </div>
+              </div>
+
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Material Prices</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                  <div><label style="{{ labelStyle }}">Cement, ₱/bag</label><input type="number" placeholder="0.00" value="{{ f.cementPrice }}" onChange="{{ h.cementPrice }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Sand, ₱/cu.m</label><input type="number" placeholder="0.00" value="{{ f.sandPrice }}" onChange="{{ h.sandPrice }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Gravel, ₱/cu.m</label><input type="number" placeholder="0.00" value="{{ f.gravelPrice }}" onChange="{{ h.gravelPrice }}" style="{{ inputStyle }}"/></div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isPlaster }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:14.5px;font-weight:700;margin-bottom:14px;">Plastering — Dimensions &amp; Specification</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                <div><label style="{{ labelStyle }}">Wall Length (m)</label><input type="number" placeholder="0.00" value="{{ f.length }}" onChange="{{ h.length }}" style="{{ inputStyle }}"/></div>
+                <div><label style="{{ labelStyle }}">Wall Height (m)</label><input type="number" placeholder="0.00" value="{{ f.height }}" onChange="{{ h.height }}" style="{{ inputStyle }}"/></div>
+              </div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Sides Plastered</label>
+                <div style="display:flex;gap:8px;">
+                  <div onClick="{{ setSides1 }}" style="{{ sidesStyle1 }}">One side</div>
+                  <div onClick="{{ setSides2 }}" style="{{ sidesStyle2 }}">Two sides</div>
+                </div>
+              </div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Wastage Allowance (%)</label><input type="number" placeholder="5" value="{{ f.wastage }}" onChange="{{ h.wastage }}" style="{{ inputStyle }}"/></div>
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Editable Coefficients (per sqm)</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                  <div><label style="{{ labelStyle }}">Cement, bags</label><input type="number" value="{{ f.cementCoeff }}" onChange="{{ h.cementCoeff }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Sand, cu.m</label><input type="number" value="{{ f.sandCoeff }}" onChange="{{ h.sandCoeff }}" style="{{ inputStyle }}"/></div>
+                </div>
+              </div>
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Material Prices</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                  <div><label style="{{ labelStyle }}">Cement, ₱/bag</label><input type="number" placeholder="0.00" value="{{ f.cementPrice }}" onChange="{{ h.cementPrice }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Sand, ₱/cu.m</label><input type="number" placeholder="0.00" value="{{ f.sandPrice }}" onChange="{{ h.sandPrice }}" style="{{ inputStyle }}"/></div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isGypsum }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:14.5px;font-weight:700;margin-bottom:14px;">Gypsum Ceiling / Partition — Specification</div>
+              <div style="margin-top:0;"><label style="{{ labelStyle }}">Installation Type</label>
+                <div style="display:flex;gap:8px;">
+                  <div onClick="{{ setTypeCeiling }}" style="{{ gypTypeStyleCeiling }}">Ceiling</div>
+                  <div onClick="{{ setTypePartition }}" style="{{ gypTypeStylePartition }}">Partition (double board)</div>
+                </div>
+              </div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Area (sqm)</label><input type="number" placeholder="0.00" value="{{ f.area }}" onChange="{{ h.area }}" style="{{ inputStyle }}"/></div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Wastage Allowance (%)</label><input type="number" placeholder="5" value="{{ f.wastage }}" onChange="{{ h.wastage }}" style="{{ inputStyle }}"/></div>
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Editable Coefficients (per sqm)</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                  <div><label style="{{ labelStyle }}">Boards, pcs</label><input type="number" value="{{ f.boardCoeff }}" onChange="{{ h.boardCoeff }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Metal furring, lm</label><input type="number" value="{{ f.furringCoeff }}" onChange="{{ h.furringCoeff }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Screws, pcs</label><input type="number" value="{{ f.screwCoeff }}" onChange="{{ h.screwCoeff }}" style="{{ inputStyle }}"/></div>
+                </div>
+              </div>
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Material Prices</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                  <div><label style="{{ labelStyle }}">Board, ₱/pc</label><input type="number" placeholder="0.00" value="{{ f.boardPrice }}" onChange="{{ h.boardPrice }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Furring, ₱/lm</label><input type="number" placeholder="0.00" value="{{ f.furringPrice }}" onChange="{{ h.furringPrice }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Screws, ₱/pc</label><input type="number" placeholder="0.00" value="{{ f.screwPrice }}" onChange="{{ h.screwPrice }}" style="{{ inputStyle }}"/></div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isPaint }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:14.5px;font-weight:700;margin-bottom:14px;">Painting — Walls / Ceiling / Steel</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                <div><label style="{{ labelStyle }}">Area to Paint (sqm)</label><input type="number" placeholder="0.00" value="{{ f.area }}" onChange="{{ h.area }}" style="{{ inputStyle }}"/></div>
+                <div><label style="{{ labelStyle }}">Number of Coats</label><input type="number" placeholder="2" value="{{ f.coats }}" onChange="{{ h.coats }}" style="{{ inputStyle }}"/></div>
+              </div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Primer Coat</label>
+                <div style="display:flex;gap:8px;">
+                  <div onClick="{{ setPrimerYes }}" style="{{ primerStyleYes }}">With primer</div>
+                  <div onClick="{{ setPrimerNo }}" style="{{ primerStyleNo }}">No primer</div>
+                </div>
+              </div>
+              <div style="margin-top:14px;"><label style="{{ labelStyle }}">Wastage Allowance (%)</label><input type="number" placeholder="5" value="{{ f.wastage }}" onChange="{{ h.wastage }}" style="{{ inputStyle }}"/></div>
+              <div style="margin-top:20px;padding-top:18px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Coverage &amp; Prices</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                  <div><label style="{{ labelStyle }}">Coverage, sqm/L</label><input type="number" value="{{ f.coverage }}" onChange="{{ h.coverage }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Paint, ₱/L</label><input type="number" placeholder="0.00" value="{{ f.paintPrice }}" onChange="{{ h.paintPrice }}" style="{{ inputStyle }}"/></div>
+                  <div><label style="{{ labelStyle }}">Primer, ₱/L</label><input type="number" placeholder="0.00" value="{{ f.primerPrice }}" onChange="{{ h.primerPrice }}" style="{{ inputStyle }}"/></div>
+                </div>
+              </div>
+            </sc-if>
+
+            <div style="margin-top:22px;padding-top:18px;border-top:1px solid oklch(0.91 0.01 255);">
+              <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Pakyaw Labor Rate</div>
+              <div style="display:flex;gap:8px;margin-bottom:12px;">
+                <div onClick="{{ setModeLaborOnly }}" style="{{ modeStyleLaborOnly }}">Labor Only</div>
+                <div onClick="{{ setModeSupply }}" style="{{ modeStyleSupply }}">Supply &amp; Install</div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr;gap:12px;">
+                <div><label style="{{ labelStyle }}">Pakyaw Rate (₱ / {{ calc.unit }})</label><input type="number" placeholder="0.00" value="{{ f.pakyawRate }}" onChange="{{ h.pakyawRate }}" style="{{ inputStyle }}"/></div>
+              </div>
+              <sc-if value="{{ isSupplyMode }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:8px;font-size:11.5px;color:oklch(0.6 0.13 70);background:oklch(0.97 0.02 70);padding:7px 10px;border-radius:6px;">Supply &amp; Install selected — material cost is included in this rate and excluded below to avoid double-counting.</div>
+              </sc-if>
+            </div>
+          </div>
+
+          <div style="position:sticky;top:0;display:flex;flex-direction:column;gap:16px;">
+            <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;padding:20px;">
+              <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:12px;">Quantity Breakdown</div>
+              <sc-for list="{{ calc.rows }}" as="r" hint-placeholder-count="3">
+                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid oklch(0.95 0.01 255);font-size:13.5px;">
+                  <div style="color:oklch(0.4 0.02 255);">{{ r.label }}</div>
+                  <div style="font-weight:700;">{{ r.value }}</div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="background:oklch(0.19 0.035 255);border-radius:10px;padding:20px;color:#fff;">
+              <div style="font-size:12.5px;font-weight:700;color:oklch(0.75 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:14px;">Line Cost</div>
+              <div style="display:flex;justify-content:space-between;font-size:13.5px;padding:6px 0;">
+                <div style="color:oklch(0.78 0.02 255);">Material Cost</div><div style="font-weight:700;">{{ calc.materialCostFmt }}</div>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:13.5px;padding:6px 0;">
+                <div style="color:oklch(0.78 0.02 255);">Pakyaw Labor Cost</div><div style="font-weight:700;">{{ calc.laborCostFmt }}</div>
+              </div>
+              <div style="height:1px;background:oklch(0.35 0.03 255);margin:10px 0;"></div>
+              <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;">
+                <div>Line Total</div><div>{{ calc.lineTotalFmt }}</div>
+              </div>
+              <div onClick="{{ addToBoq }}" style="margin-top:16px;background:#fff;color:oklch(0.19 0.035 255);font-size:13.5px;font-weight:700;padding:11px;border-radius:7px;text-align:center;cursor:pointer;">Add to BOQ →</div>
+            </div>
+
+            <div style="background:oklch(0.97 0.015 155);border:1px solid oklch(0.88 0.03 155);border-radius:10px;padding:14px 16px;font-size:12.5px;color:oklch(0.35 0.06 155);">{{ boqCountNote }}</div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isBoq }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+          <div>
+            <div style="font-size:22px;font-weight:700;">Bill of Quantities</div>
+            <div style="font-size:13px;color:oklch(0.5 0.02 255);margin-top:3px;">Consolidated line items from the Estimator. Revise rates or remove items before exporting.</div>
+          </div>
+          <div onClick="{{ goReports }}" style="background:oklch(0.28 0.06 255);color:#fff;font-size:13.5px;font-weight:600;padding:10px 18px;border-radius:7px;cursor:pointer;">Export Quotation →</div>
+        </div>
+
+        <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;overflow:hidden;margin-bottom:20px;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:oklch(0.98 0.004 255);">
+                <th style="text-align:left;padding:10px 16px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Item</th>
+                <th style="text-align:right;padding:10px 16px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Qty</th>
+                <th style="text-align:left;padding:10px 16px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Mode</th>
+                <th style="text-align:right;padding:10px 16px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Material</th>
+                <th style="text-align:right;padding:10px 16px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Labor</th>
+                <th style="text-align:right;padding:10px 16px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Line Total</th>
+                <th style="padding:10px 16px;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ boqRows }}" as="row" hint-placeholder-count="3">
+                <tr style="border-top:1px solid oklch(0.94 0.01 255);">
+                  <td style="padding:12px 16px;font-weight:600;">{{ row.label }}</td>
+                  <td style="padding:12px 16px;text-align:right;color:oklch(0.5 0.02 255);">{{ row.qtyLabel }}</td>
+                  <td style="padding:12px 16px;"><span style="{{ row.modeBadge }}">{{ row.modeLabel }}</span></td>
+                  <td style="padding:12px 16px;text-align:right;">{{ row.materialFmt }}</td>
+                  <td style="padding:12px 16px;text-align:right;">{{ row.laborFmt }}</td>
+                  <td style="padding:12px 16px;text-align:right;font-weight:700;">{{ row.totalFmt }}</td>
+                  <td style="padding:12px 16px;text-align:right;"><span onClick="{{ row.remove }}" style="cursor:pointer;color:oklch(0.58 0.18 25);font-size:12px;font-weight:600;">Remove</span></td>
+                </tr>
+              </sc-for>
+              <sc-if value="{{ boqEmpty }}" hint-placeholder-val="{{ false }}">
+                <tr><td colspan="7" style="padding:30px;text-align:center;color:oklch(0.6 0.02 255);">No items yet. Go to the Estimator and add a calculated line item.</td></tr>
+              </sc-if>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,0.6fr);gap:20px;">
+          <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;padding:20px;">
+            <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:14px;">Additional Costs</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+              <div><label style="{{ labelStyle }}">Equipment, ₱</label><input type="number" placeholder="0.00" value="{{ summary.equipment }}" onChange="{{ h2.equipment }}" style="{{ inputStyle }}"/></div>
+              <div><label style="{{ labelStyle }}">Delivery, ₱</label><input type="number" placeholder="0.00" value="{{ summary.delivery }}" onChange="{{ h2.delivery }}" style="{{ inputStyle }}"/></div>
+              <div><label style="{{ labelStyle }}">Overhead, %</label><input type="number" value="{{ summary.overheadPct }}" onChange="{{ h2.overheadPct }}" style="{{ inputStyle }}"/></div>
+              <div><label style="{{ labelStyle }}">Contingency, %</label><input type="number" value="{{ summary.contingencyPct }}" onChange="{{ h2.contingencyPct }}" style="{{ inputStyle }}"/></div>
+              <div><label style="{{ labelStyle }}">Profit, %</label><input type="number" value="{{ summary.profitPct }}" onChange="{{ h2.profitPct }}" style="{{ inputStyle }}"/></div>
+              <div>
+                <label style="{{ labelStyle }}">VAT / Tax</label>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div onClick="{{ toggleTax }}" style="{{ taxToggleStyle }}"><div style="{{ taxKnobStyle }}"></div></div>
+                  <input type="number" value="{{ summary.taxPct }}" onChange="{{ h2.taxPct }}" style="{{ inputStyleSmall }}"/><span style="font-size:12.5px;color:oklch(0.5 0.02 255);">%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="background:oklch(0.19 0.035 255);border-radius:10px;padding:22px;color:#fff;">
+            <div style="font-size:12.5px;font-weight:700;color:oklch(0.75 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:14px;">Cost Summary</div>
+            <sc-for list="{{ summaryRows }}" as="s" hint-placeholder-count="7">
+              <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;">
+                <div style="color:oklch(0.78 0.02 255);">{{ s.label }}</div><div style="font-weight:600;">{{ s.value }}</div>
+              </div>
+            </sc-for>
+            <div style="height:1px;background:oklch(0.35 0.03 255);margin:12px 0;"></div>
+            <div style="display:flex;justify-content:space-between;font-size:19px;font-weight:700;">
+              <div>Grand Total</div><div>{{ grandTotalFmt }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isLibrary }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <div style="margin-bottom:18px;">
+          <div style="font-size:22px;font-weight:700;">Cost Library</div>
+          <div style="font-size:13px;color:oklch(0.5 0.02 255);margin-top:3px;">Set material unit prices and pakyaw labor rates. All values start blank — fill in your current market rates.</div>
+        </div>
+
+        <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;overflow:hidden;margin-bottom:20px;">
+          <div style="padding:14px 20px;border-bottom:1px solid oklch(0.93 0.01 255);font-size:14px;font-weight:700;">Material Prices</div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:oklch(0.98 0.004 255);">
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Material</th>
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Unit</th>
+                <th style="text-align:right;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Unit Price (₱)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ libMaterials }}" as="m" hint-placeholder-count="8">
+                <tr style="border-top:1px solid oklch(0.94 0.01 255);">
+                  <td style="padding:10px 20px;font-weight:600;">{{ m.name }}</td>
+                  <td style="padding:10px 20px;color:oklch(0.5 0.02 255);">{{ m.unit }}</td>
+                  <td style="padding:8px 20px;text-align:right;"><input type="number" placeholder="0.00" value="{{ m.price }}" onChange="{{ m.onChange }}" style="{{ inputStyleRight }}"/></td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;overflow:hidden;">
+          <div style="padding:14px 20px;border-bottom:1px solid oklch(0.93 0.01 255);font-size:14px;font-weight:700;">Pakyaw Labor Rates</div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:oklch(0.98 0.004 255);">
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Scope of Work</th>
+                <th style="text-align:left;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Unit</th>
+                <th style="text-align:right;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Labor Only (₱)</th>
+                <th style="text-align:right;padding:10px 20px;color:oklch(0.5 0.02 255);font-weight:600;font-size:11px;text-transform:uppercase;">Supply &amp; Install (₱)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ libLabor }}" as="l" hint-placeholder-count="8">
+                <tr style="border-top:1px solid oklch(0.94 0.01 255);">
+                  <td style="padding:10px 20px;font-weight:600;">{{ l.name }}</td>
+                  <td style="padding:10px 20px;color:oklch(0.5 0.02 255);">{{ l.unit }}</td>
+                  <td style="padding:8px 20px;text-align:right;"><input type="number" placeholder="0.00" value="{{ l.laborOnly }}" onChange="{{ l.onChangeLO }}" style="{{ inputStyleRight }}"/></td>
+                  <td style="padding:8px 20px;text-align:right;"><input type="number" placeholder="0.00" value="{{ l.supplyInstall }}" onChange="{{ l.onChangeSI }}" style="{{ inputStyleRight }}"/></td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isReports }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <div style="margin-bottom:18px;">
+          <div style="font-size:22px;font-weight:700;">Reports &amp; Quotation Export</div>
+          <div style="font-size:13px;color:oklch(0.5 0.02 255);margin-top:3px;">Preview the client-facing quotation document and configure export settings.</div>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,0.55fr);gap:20px;align-items:start;">
+
+          <div style="background:#fff;border:1px solid oklch(0.89 0.01 255);border-radius:10px;box-shadow:0 1px 3px oklch(0 0 0 / 0.06);padding:40px;min-height:560px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid oklch(0.19 0.035 255);padding-bottom:18px;margin-bottom:18px;">
+              <div>
+                <div style="font-size:18px;font-weight:700;color:oklch(0.19 0.035 255);">{{ company.name }}</div>
+                <div style="font-size:11.5px;color:oklch(0.55 0.02 255);margin-top:4px;">{{ company.address }}</div>
+                <div style="font-size:11.5px;color:oklch(0.55 0.02 255);">{{ company.contact }}</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:15px;font-weight:700;letter-spacing:0.5px;">QUOTATION</div>
+                <div style="font-size:11px;color:oklch(0.55 0.02 255);margin-top:3px;">No. Q-2026-0142</div>
+                <div style="font-size:11px;color:oklch(0.55 0.02 255);">Date: Oct 20, 2026</div>
+              </div>
+            </div>
+            <div style="font-size:12px;color:oklch(0.5 0.02 255);margin-bottom:16px;">Prepared for: <strong style="color:oklch(0.22 0.015 255);">Client Name, Project Address</strong></div>
+            <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;">
+              <thead><tr style="border-bottom:1px solid oklch(0.85 0.01 255);"><th style="text-align:left;padding:6px 0;color:oklch(0.5 0.02 255);">Item</th><th style="text-align:right;padding:6px 0;color:oklch(0.5 0.02 255);">Qty</th><th style="text-align:right;padding:6px 0;color:oklch(0.5 0.02 255);">Amount</th></tr></thead>
+              <tbody>
+                <sc-for list="{{ boqRows }}" as="row" hint-placeholder-count="2">
+                  <tr style="border-bottom:1px solid oklch(0.94 0.01 255);"><td style="padding:7px 0;">{{ row.label }}</td><td style="text-align:right;padding:7px 0;">{{ row.qtyLabel }}</td><td style="text-align:right;padding:7px 0;">{{ row.totalFmt }}</td></tr>
+                </sc-for>
+              </tbody>
+            </table>
+            <div style="display:flex;justify-content:flex-end;margin-bottom:28px;">
+              <div style="width:230px;">
+                <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;padding-top:8px;border-top:2px solid oklch(0.19 0.035 255);"><div>Grand Total</div><div>{{ grandTotalFmt }}</div></div>
+              </div>
+            </div>
+            <div style="font-size:11px;color:oklch(0.5 0.02 255);line-height:1.6;margin-bottom:30px;">{{ reportSettings.terms }}</div>
+            <sc-if value="{{ reportSettings.includeSignature }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;justify-content:space-between;margin-top:30px;">
+                <div style="width:40%;"><div style="border-top:1px solid oklch(0.6 0.02 255);padding-top:6px;font-size:11px;color:oklch(0.5 0.02 255);">Prepared by / QS</div></div>
+                <div style="width:40%;"><div style="border-top:1px solid oklch(0.6 0.02 255);padding-top:6px;font-size:11px;color:oklch(0.5 0.02 255);">Conforme / Client</div></div>
+              </div>
+            </sc-if>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;padding:18px;">
+              <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:12px;">Letterhead</div>
+              <label style="{{ labelStyle }}">Company Name</label><input value="{{ company.name }}" onChange="{{ h3.companyName }}" style="{{ inputStyle }}"/>
+              <label style="{{ labelStyle }}margin-top:10px;display:block;">Address</label><input value="{{ company.address }}" onChange="{{ h3.companyAddress }}" style="{{ inputStyle }}"/>
+              <label style="{{ labelStyle }}margin-top:10px;display:block;">Contact Info</label><input value="{{ company.contact }}" onChange="{{ h3.companyContact }}" style="{{ inputStyle }}"/>
+            </div>
+            <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;padding:18px;">
+              <div style="font-size:12.5px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:12px;">Export Settings</div>
+              <label style="{{ labelStyle }}">Terms &amp; Notes</label>
+              <textarea onChange="{{ h3.terms }}" style="width:100%;box-sizing:border-box;min-height:70px;border:1px solid oklch(0.85 0.01 255);border-radius:7px;padding:9px 11px;font-size:13px;resize:vertical;">{{ reportSettings.terms }}</textarea>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;">
+                <label style="{{ labelStyle }}margin:0;">Include Signature Block</label>
+                <div onClick="{{ toggleSignature }}" style="{{ sigToggleStyle }}"><div style="{{ sigKnobStyle }}"></div></div>
+              </div>
+              <label style="{{ labelStyle }}margin-top:12px;display:block;">Export Format</label>
+              <div style="display:flex;gap:8px;">
+                <div onClick="{{ setFormatPdf }}" style="{{ formatStylePdf }}">PDF</div>
+                <div onClick="{{ setFormatXls }}" style="{{ formatStyleXls }}">Excel</div>
+              </div>
+            </div>
+            <div onClick="{{ exportReport }}" style="background:oklch(0.28 0.06 255);color:#fff;font-size:13.5px;font-weight:700;padding:12px;border-radius:8px;text-align:center;cursor:pointer;">Download {{ reportSettings.formatLabel }}</div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <div style="margin-bottom:18px;">
+          <div style="font-size:22px;font-weight:700;">Settings</div>
+          <div style="font-size:13px;color:oklch(0.5 0.02 255);margin-top:3px;">Company profile and Google Sheets backup &amp; sync.</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:minmax(0,0.9fr) minmax(0,1.1fr);gap:20px;align-items:start;">
+          <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;padding:20px;">
+            <div style="font-size:14px;font-weight:700;margin-bottom:14px;">Company Profile</div>
+            <label style="{{ labelStyle }}">Company Name</label><input value="{{ company.name }}" onChange="{{ h3.companyName }}" style="{{ inputStyle }}"/>
+            <label style="{{ labelStyle }}margin-top:10px;display:block;">Address</label><input value="{{ company.address }}" onChange="{{ h3.companyAddress }}" style="{{ inputStyle }}"/>
+            <label style="{{ labelStyle }}margin-top:10px;display:block;">Contact</label><input value="{{ company.contact }}" onChange="{{ h3.companyContact }}" style="{{ inputStyle }}"/>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;padding:20px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                <div style="font-size:14px;font-weight:700;">Google Sheets Backup</div>
+                <span style="{{ sheetsStatusBadge }}">{{ sheetsStatusLabel }}</span>
+              </div>
+              <div style="font-size:12.5px;color:oklch(0.5 0.02 255);margin-bottom:14px;">Project data, BOQ, prices and cost summaries sync to a Google Sheet via an Apps Script Web App. See backend/DEPLOYMENT.md for setup. The token is a shared secret: anyone who can use this browser profile can use it, so treat this as an internal tool.</div>
+              <label style="{{ labelStyle }}">Apps Script Web App URL</label>
+              <input placeholder="https://script.google.com/macros/s/…/exec" value="{{ backend.scriptUrl }}" onChange="{{ h4.scriptUrl }}" style="{{ inputStyle }}"/>
+              <label style="{{ labelStyle }}margin-top:10px;display:block;">API Token</label>
+              <input type="password" placeholder="shared secret from Script Properties" value="{{ backend.apiToken }}" onChange="{{ h4.apiToken }}" style="{{ inputStyle }}"/>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;">
+                <div style="font-size:11.5px;color:oklch(0.5 0.02 255);">Remember token on this device — otherwise it is kept only until this tab closes. Only enable on a computer you trust.</div>
+                <div onClick="{{ toggleRememberToken }}" style="{{ rememberToggleStyle }}"><div style="{{ rememberKnobStyle }}"></div></div>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:12px;">
+                <div onClick="{{ connectSheets }}" style="flex:1;background:oklch(0.28 0.06 255);color:#fff;font-size:13px;font-weight:700;padding:10px;border-radius:7px;text-align:center;cursor:pointer;">{{ sheetsConnectLabel }}</div>
+                <div onClick="{{ syncNow }}" style="flex:1;background:#fff;border:1px solid oklch(0.85 0.01 255);color:oklch(0.3 0.02 255);font-size:13px;font-weight:700;padding:10px;border-radius:7px;text-align:center;cursor:pointer;">Sync Now</div>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:8px;">
+                <div onClick="{{ migrateLocalData }}" style="flex:1;background:#fff;border:1px solid oklch(0.85 0.01 255);color:oklch(0.3 0.02 255);font-size:12.5px;font-weight:600;padding:9px;border-radius:7px;text-align:center;cursor:pointer;">Migrate Local Data</div>
+                <div onClick="{{ runHealthCheck }}" style="flex:1;background:#fff;border:1px solid oklch(0.85 0.01 255);color:oklch(0.3 0.02 255);font-size:12.5px;font-weight:600;padding:9px;border-radius:7px;text-align:center;cursor:pointer;">Run Health Check</div>
+              </div>
+              <sc-if value="{{ dbHealth }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:10px;background:oklch(0.98 0.004 255);border-radius:7px;padding:10px 12px;">
+                  <sc-for list="{{ dbHealthRows }}" as="row" hint-placeholder-count="4">
+                    <div style="display:flex;justify-content:space-between;font-size:11.5px;color:oklch(0.5 0.02 255);padding:2px 0;"><div>{{ row.name }}</div><div style="font-weight:700;color:oklch(0.3 0.02 255);">{{ row.count }} rows</div></div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <div style="margin-top:18px;padding-top:16px;border-top:1px dashed oklch(0.89 0.01 255);">
+                <div style="font-size:12px;font-weight:700;color:oklch(0.5 0.02 255);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px;">Field Mapping</div>
+                <sc-for list="{{ sheetMapping }}" as="m" hint-placeholder-count="4">
+                  <div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;padding:7px 0;border-bottom:1px solid oklch(0.95 0.01 255);">
+                    <div style="color:oklch(0.4 0.02 255);">{{ m.app }}</div>
+                    <div style="color:oklch(0.65 0.01 255);">→</div>
+                    <div style="font-family:ui-monospace,Menlo,monospace;">{{ m.sheet }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;padding:20px;">
+              <div style="font-size:14px;font-weight:700;margin-bottom:12px;">Sync Log</div>
+              <sc-for list="{{ syncLog }}" as="entry" hint-placeholder-count="3">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid oklch(0.95 0.01 255);font-size:12.5px;">
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="width:6px;height:6px;border-radius:50%;background:{{ entry.dotColor }};"></div>
+                    <div>{{ entry.text }}</div>
+                  </div>
+                  <div style="color:oklch(0.55 0.02 255);">{{ entry.time }}</div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="background:#fff;border:1px solid oklch(0.91 0.01 255);border-radius:10px;padding:20px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                <div style="font-size:14px;font-weight:700;">Revisions — {{ currentProjectName }}</div>
+                <div onClick="{{ saveRevision }}" style="font-size:12px;font-weight:700;color:oklch(0.28 0.06 255);cursor:pointer;">+ Save Revision</div>
+              </div>
+              <sc-for list="{{ revisionsList }}" as="rev" hint-placeholder-count="2">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid oklch(0.95 0.01 255);font-size:12.5px;">
+                  <div>
+                    <div style="font-weight:600;">{{ rev.label }}</div>
+                    <div style="color:oklch(0.55 0.02 255);font-size:11.5px;">{{ rev.timestamp }}</div>
+                  </div>
+                  <span onClick="{{ rev.restore }}" style="{{ rev.restoreStyle }}">{{ rev.restoreLabel }}</span>
+                </div>
+              </sc-for>
+              <sc-if value="{{ revisionsEmpty }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:14px 0;color:oklch(0.6 0.02 255);font-size:12.5px;">No saved revisions yet — every save to Google Sheets is recorded here; "Save Revision" adds a labelled one.</div>
+              </sc-if>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const WORK_TYPES = ['chb','rebar','concrete','plaster','gypsum','paint'];
+
+// Per-project defaults. Every new or freshly-loaded project starts from these, never
+// from whatever the previously open project had in memory.
+const DEFAULT_FORMS = () => ({
+  chb: { length:'', height:'', thickness:'6', openingsArea:'', wastage:'5', blockCoeff:'12.5', cementCoeff:'0.12', sandCoeff:'0.013', blockPrice:'', cementPrice:'', sandPrice:'', mode:'laborOnly', pakyawRate:'' },
+  rebar: { diameter:'10', totalLength:'', wastage:'5', unitPriceKg:'', rateUnit:'kg', mode:'laborOnly', pakyawRate:'' },
+  concrete: { length:'', width:'', thickness:'', mixClass:'A', wastage:'5', cementCoeff:'9.0', sandCoeff:'0.5', gravelCoeff:'1.0', cementPrice:'', sandPrice:'', gravelPrice:'', mode:'laborOnly', pakyawRate:'' },
+  plaster: { length:'', height:'', sides:'1', wastage:'5', cementCoeff:'0.09', sandCoeff:'0.018', cementPrice:'', sandPrice:'', mode:'laborOnly', pakyawRate:'' },
+  gypsum: { type:'ceiling', area:'', wastage:'5', boardCoeff:'0.36', furringCoeff:'2.0', screwCoeff:'30', boardPrice:'', furringPrice:'', screwPrice:'', mode:'laborOnly', pakyawRate:'' },
+  paint: { area:'', coats:'2', primer:'yes', wastage:'5', coverage:'10', paintPrice:'', primerPrice:'', mode:'laborOnly', pakyawRate:'' },
+});
+const DEFAULT_SUMMARY = () => ({ equipment:'', delivery:'', overheadPct:'10', contingencyPct:'5', profitPct:'15', taxEnabled:false, taxPct:'12' });
+const DEFAULT_MATERIALS = () => [
+  {name:'Portland Cement, 40kg', unit:'bag', price:''},
+  {name:'Washed Sand', unit:'cu.m', price:''},
+  {name:'Gravel (3/4")', unit:'cu.m', price:''},
+  {name:'CHB, 4 in', unit:'pc', price:''},
+  {name:'CHB, 6 in', unit:'pc', price:''},
+  {name:'Rebar, 10mm x 6m', unit:'pc', price:''},
+  {name:'Gypsum Board, 1/2in', unit:'pc', price:''},
+  {name:'Latex Paint', unit:'liter', price:''},
+];
+const DEFAULT_LABOR = () => [
+  {name:'CHB Laying, 4"/6"', unit:'sqm', laborOnly:'', supplyInstall:''},
+  {name:'Rebar Fabrication & Install', unit:'kg', laborOnly:'', supplyInstall:''},
+  {name:'Concrete Pouring', unit:'cu.m', laborOnly:'', supplyInstall:''},
+  {name:'Plastering', unit:'sqm', laborOnly:'', supplyInstall:''},
+  {name:'Gypsum Ceiling Install', unit:'sqm', laborOnly:'', supplyInstall:''},
+  {name:'Painting, 2 coats', unit:'sqm', laborOnly:'', supplyInstall:''},
+];
+// Fields that make up one project's saved data (local cache + server snapshot).
+const SNAPSHOT_KEYS = [...WORK_TYPES, 'boq', 'boqSeq', 'summary', 'libMaterials', 'libLabor'];
+
+class Component extends DCLogic {
+  state = {
+    screen: 'dashboard',
+    workType: 'chb',
+    ...DEFAULT_FORMS(),
+    boq: [],
+    boqSeq: 1,
+    currentProjectId: 'p1',
+    projects: [
+      {id:'p1', name:'Two-Storey Residence', type:'Residential', status:'In Progress', value:1842500, updated:'2 hours ago', owner:'J. Santos', location:'Quezon City', revisions:2},
+      {id:'p2', name:'Retail Fit-out, Unit 4B', type:'Commercial', status:'For Review', value:615200, updated:'Yesterday', owner:'J. Santos', location:'Makati', revisions:1},
+      {id:'p3', name:'Perimeter Fence & Gate', type:'Residential', status:'Draft', value:98400, updated:'3 days ago', owner:'J. Santos', location:'Antipolo', revisions:0},
+      {id:'p4', name:'Warehouse Extension', type:'Industrial', status:'Approved', value:3210000, updated:'1 week ago', owner:'J. Santos', location:'Cavite', revisions:3},
+      {id:'p5', name:'School Classroom Bldg.', type:'Institutional', status:'In Progress', value:4120750, updated:'1 week ago', owner:'J. Santos', location:'Laguna', revisions:1},
+    ],
+    revisions: [],
+    syncStatus: 'saved', lastSyncAt: null, pendingChanges: false, conflictInfo: null,
+    projectLoading: false, loadError: null,
+    backend: { scriptUrl:'', apiToken:'', rememberToken:false, connected:false },
+    syncLogEntries: [], dbHealth: null, trashedProjects: [], showTrash: false,
+    summary: DEFAULT_SUMMARY(),
+    company: { name:'ABC Builders & Construction Services', address:'123 Mabini St., Quezon City, Metro Manila', contact:'(02) 8123-4567 · abc@email.com' },
+    reportSettings: { terms:'Prices valid for 30 days. 50% downpayment upon approval, balance upon completion. Material price fluctuations beyond quotation validity may affect final cost.', includeSignature: true, format:'pdf' },
+    libMaterials: DEFAULT_MATERIALS(),
+    libLabor: DEFAULT_LABOR(),
+  };
+
+  // Server Version last seen per project, used as expectedVersion on save.
+  _versions = {};
+
+  n(v){ const x = parseFloat(v); return isNaN(x) ? 0 : x; }
+  nn(v){ return Math.max(0, this.n(v)); }
+  peso(v){ return '₱' + this.n(v).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+  updateForm(type, field, value){ this.setState(s => ({ [type]: { ...s[type], [field]: value } })); }
+  makeHandler(type, field){ return (e) => this.updateForm(type, field, e.target.value); }
+
+  blankProjectData(){
+    return { ...DEFAULT_FORMS(), boq: [], boqSeq: 1, summary: DEFAULT_SUMMARY(), libMaterials: DEFAULT_MATERIALS(), libLabor: DEFAULT_LABOR(),
+      revisions: [], conflictInfo: null, loadError: null };
+  }
+
+  projectSnapshot(s){
+    const o = {};
+    SNAPSHOT_KEYS.forEach(k => { o[k] = s[k]; });
+    return o;
+  }
+
+  // Turns a stored snapshot (local cache or server revision) back into state, filling
+  // any missing fields from defaults so old or partial snapshots stay safe to apply.
+  snapshotToState(snap){
+    const forms = DEFAULT_FORMS();
+    const out = {};
+    WORK_TYPES.forEach(wt => { out[wt] = { ...forms[wt], ...((snap && snap[wt]) || {}) }; });
+    out.boq = Array.isArray(snap && snap.boq) ? snap.boq : [];
+    out.boqSeq = Math.max(Number(snap && snap.boqSeq) || 1, out.boq.reduce((a, b) => Math.max(a, Number(b.id) || 0), 0) + 1);
+    out.summary = { ...DEFAULT_SUMMARY(), ...((snap && snap.summary) || {}) };
+    out.libMaterials = Array.isArray(snap && snap.libMaterials) && snap.libMaterials.length ? snap.libMaterials : DEFAULT_MATERIALS();
+    out.libLabor = Array.isArray(snap && snap.libLabor) && snap.libLabor.length ? snap.libLabor : DEFAULT_LABOR();
+    return out;
+  }
+
+  dataSignature(s){
+    return JSON.stringify([s.currentProjectId, this.projectSnapshot(s)]);
+  }
+
+  /** Local cache (offline copy) **/
+
+  readCache(id){
+    if (!id) return null;
+    try {
+      const raw = localStorage.getItem('qb_project_' + id);
+      if (!raw) return null;
+      const c = JSON.parse(raw);
+      if (c.version && !this._versions[id]) this._versions[id] = c.version;
+      return { data: this.snapshotToState(c), revisions: (c.revisions || []).filter(r => r.snapshot), dirty: !!c.dirty, name: c.name };
+    } catch (e) { return null; }
+  }
+
+  writeCache(dirty){
+    const S = this.state, id = S.currentProjectId;
+    if (!id) return;
+    const meta = S.projects.find(p => p.id === id) || {};
+    try {
+      localStorage.setItem('qb_project_' + id, JSON.stringify({ ...this.projectSnapshot(S), name: meta.name, dirty: !!dirty,
+        version: this._versions[id] || 1, revisions: S.revisions.filter(r => r.snapshot) }));
+    } catch (e) {}
+  }
+
+  patchCache(id, patch){
+    try {
+      const raw = localStorage.getItem('qb_project_' + id);
+      if (raw) localStorage.setItem('qb_project_' + id, JSON.stringify({ ...JSON.parse(raw), ...patch }));
+    } catch (e) {}
+  }
+
+  // Marks the current state as the saved baseline so it doesn't trigger an autosave.
+  resetBaseline(dirty){
+    this._lastSig = this.dataSignature(this.state);
+    this.writeCache(dirty);
+  }
+
+  saveBackendPrefs(){
+    const b = this.state.backend;
+    try {
+      localStorage.setItem('qb_backend', JSON.stringify({ scriptUrl: b.scriptUrl, rememberToken: !!b.rememberToken, apiToken: b.rememberToken ? b.apiToken : undefined }));
+      // Not remembered: keep the token for this browser tab only.
+      if (b.apiToken) sessionStorage.setItem('qb_token', b.apiToken); else sessionStorage.removeItem('qb_token');
+    } catch (e) {}
+  }
+
+  componentDidMount(){
+    const patch = {};
+    try {
+      const b = JSON.parse(localStorage.getItem('qb_backend') || 'null');
+      if (b) {
+        let token = '';
+        try { token = sessionStorage.getItem('qb_token') || ''; } catch (e) {}
+        if (b.rememberToken) token = b.apiToken || token;
+        else if (b.rememberToken === undefined && b.apiToken) token = token || b.apiToken; // legacy plaintext copy, moved below
+        patch.backend = { scriptUrl: b.scriptUrl || '', apiToken: token, rememberToken: !!b.rememberToken, connected: false };
+      }
+      const prefs = JSON.parse(localStorage.getItem('qb_prefs') || 'null');
+      if (prefs && prefs.company) patch.company = { ...this.state.company, ...prefs.company };
+      if (prefs && prefs.reportSettings) patch.reportSettings = { ...this.state.reportSettings, ...prefs.reportSettings };
+      const projects = JSON.parse(localStorage.getItem('qb_projects') || 'null');
+      if (Array.isArray(projects)) patch.projects = projects;
+      const cur = localStorage.getItem('qb_current');
+      if (cur !== null) patch.currentProjectId = cur || null;
+    } catch (e) {}
+    this.setState(patch);
+    if (patch.backend) this.saveBackendPrefs();
+
+    const cached = this.readCache(this.state.currentProjectId);
+    this.setState({ ...this.blankProjectData(), ...(cached ? { ...cached.data, revisions: cached.revisions } : {}), pendingChanges: !!(cached && cached.dirty) });
+    this.resetBaseline(cached && cached.dirty);
+    this._lastPrefsSig = JSON.stringify([this.state.company, this.state.reportSettings]);
+    this._lastProjectsSig = JSON.stringify(this.state.projects);
+    if (cached) this.appendLog('Loaded local offline copy', 'ok');
+
+    window.addEventListener('online', () => {
+      const b = this.state.backend;
+      if (!b.connected && b.scriptUrl && b.apiToken) this.testConnection();
+      else if (this.state.pendingChanges) this.performSync();
+      else this.setState({syncStatus:'saved'});
+    });
+    window.addEventListener('offline', () => this.setState({syncStatus:'offline'}));
+    if (!navigator.onLine) this.setState({syncStatus:'offline'});
+    setTimeout(() => { if (this.state.backend.scriptUrl && this.state.backend.apiToken) this.testConnection(); }, 100);
+  }
+
+  componentDidUpdate(){
+    const S = this.state;
+    const prefsSig = JSON.stringify([S.company, S.reportSettings]);
+    if (prefsSig !== this._lastPrefsSig) {
+      this._lastPrefsSig = prefsSig;
+      try { localStorage.setItem('qb_prefs', JSON.stringify({ company: S.company, reportSettings: S.reportSettings })); } catch (e) {}
+    }
+    const projectsSig = JSON.stringify(S.projects);
+    if (projectsSig !== this._lastProjectsSig) {
+      this._lastProjectsSig = projectsSig;
+      try { localStorage.setItem('qb_projects', projectsSig); } catch (e) {}
+    }
+    // Never autosave a project whose server data hasn't arrived yet.
+    if (S.projectLoading) return;
+    const sig = this.dataSignature(S);
+    if (sig === this._lastSig) return;
+    this._lastSig = sig;
+    this.writeCache(true);
+    this.setState({ syncStatus: 'saving', pendingChanges: true });
+    clearTimeout(this._syncTimer);
+    this._syncTimer = setTimeout(() => this.performSync(), 1200);
+  }
+
+  appendLog(text, status){
+    const dot = status === 'error' ? 'oklch(0.58 0.18 25)' : status === 'warn' ? 'oklch(0.7 0.14 70)' : 'oklch(0.6 0.13 155)';
+    this.setState(s => ({ syncLogEntries: [{ text, time: new Date().toLocaleTimeString(), dotColor: dot }, ...s.syncLogEntries].slice(0, 20) }));
+  }
+
+  clientId_(){ return 'web-' + (this._clientId || (this._clientId = Math.random().toString(36).slice(2))); }
+
+  // All data calls are POST with the token in the body — never in a URL.
+  api(action, body){
+    const { scriptUrl, apiToken } = this.state.backend;
+    return fetch(scriptUrl, { method:'POST', body: JSON.stringify({ ...(body || {}), action, token: apiToken, clientId: this.clientId_() }) })
+      .then(r => r.json());
+  }
+
+  computeTotals(S){
+    const materialsSubtotal = S.boq.reduce((a,r)=>a+this.nn(r.materialCost),0);
+    const laborSubtotal = S.boq.reduce((a,r)=>a+this.nn(r.laborCost),0);
+    const sm = S.summary;
+    const base = materialsSubtotal + laborSubtotal + this.nn(sm.equipment) + this.nn(sm.delivery);
+    const overheadAmt = base * this.nn(sm.overheadPct)/100;
+    const contingencyAmt = base * this.nn(sm.contingencyPct)/100;
+    const profitAmt = (base+overheadAmt+contingencyAmt) * this.nn(sm.profitPct)/100;
+    const preTax = base+overheadAmt+contingencyAmt+profitAmt;
+    const taxAmt = sm.taxEnabled ? preTax * this.nn(sm.taxPct)/100 : 0;
+    return { materialsSubtotal, laborSubtotal, overheadAmt, contingencyAmt, profitAmt, taxAmt, grandTotal: preTax + taxAmt };
+  }
+
+  // Server payload built from a project snapshot (current state, cache entry, or migration source).
+  payloadFromSnapshot(snap, meta){
+    const t = this.computeTotals(snap);
+    return {
+      name: meta.name || 'Untitled Project', owner: meta.owner || '', location: meta.location || '', type: meta.type || '', status: meta.status || 'Draft',
+      value: t.grandTotal,
+      materials: snap.libMaterials.map(m=>({name:m.name, unit:m.unit, price:this.nn(m.price)})),
+      laborRates: snap.libLabor.map(l=>({name:l.name, unit:l.unit, laborOnly:this.nn(l.laborOnly), supplyInstall:this.nn(l.supplyInstall)})),
+      boq: snap.boq.map(b=>({id:'b'+b.id, label:b.label, qtyLabel:b.qtyLabel, unit:b.unit||'', materialCost:this.nn(b.materialCost), laborCost:this.nn(b.laborCost), mode:b.mode})),
+      summary: { ...snap.summary, materialsSubtotal: t.materialsSubtotal, laborSubtotal: t.laborSubtotal },
+      estimates: WORK_TYPES.map(wt => ({ workType: wt, inputs: snap[wt] })),
+      grandTotal: t.grandTotal,
+      snapshot: snap,
+    };
+  }
+
+  toServerProject(){
+    const S = this.state;
+    return this.payloadFromSnapshot(this.projectSnapshot(S), S.projects.find(p=>p.id===S.currentProjectId) || {});
+  }
+
+  fromServerBundle(bundle){
+    const forms = DEFAULT_FORMS();
+    (bundle.estimates || []).forEach(e => {
+      if (!forms[e.WorkType]) return;
+      try { forms[e.WorkType] = { ...forms[e.WorkType], ...JSON.parse(e.InputsJSON || '{}') }; } catch (err) {}
+    });
+    const materials = bundle.materials || [];
+    const laborRates = bundle.laborRates || [];
+    const boq = (bundle.boq || []).map((b,i)=>({ id:i+1, workType:'', label:b.Label, qtyLabel:b.Qty, unit:b.Unit||'', materialCost:this.n(b.MaterialCost), laborCost:this.n(b.LaborCost), mode:b.Mode }));
+    const s = bundle.summary;
+    const str = (v, dflt) => v === '' || v === null || v === undefined ? dflt : String(v);
+    return {
+      ...forms,
+      libMaterials: materials.length ? materials.map(m=>({name:m.Name, unit:m.Unit, price: m.Price ? String(m.Price) : ''})) : DEFAULT_MATERIALS(),
+      libLabor: laborRates.length ? laborRates.map(l=>({name:l.ScopeOfWork, unit:l.Unit, laborOnly: l.LaborOnlyRate ? String(l.LaborOnlyRate) : '', supplyInstall: l.SupplyInstallRate ? String(l.SupplyInstallRate) : ''})) : DEFAULT_LABOR(),
+      boq, boqSeq: boq.length + 1,
+      summary: s ? { equipment:s.Equipment ? String(s.Equipment) : '', delivery:s.Delivery ? String(s.Delivery) : '', overheadPct:str(s.OverheadPct,'10'), contingencyPct:str(s.ContingencyPct,'5'),
+        profitPct:str(s.ProfitPct,'15'), taxEnabled: s.TaxEnabled === true || s.TaxEnabled === 'TRUE' || s.TaxEnabled === 'true', taxPct:str(s.TaxPct,'12') } : DEFAULT_SUMMARY(),
+      revisions: (bundle.revisions||[]).map(r=>({ id:r.RevisionID, label:r.Label, timestamp:r.CreatedAt, snapshot:null, restorable: !!r.hasSnapshot })),
+    };
+  }
+
+  /** Saving **/
+
+  buildSyncJob(revisionLabel){
+    const S = this.state;
+    const meta = S.projects.find(p => p.id === S.currentProjectId) || {};
+    return { projectId: S.currentProjectId, project: this.toServerProject(), revisionLabel, createIfMissing: !!meta.local, sig: this.dataSignature(S) };
+  }
+
+  performSync(revisionLabel){
+    clearTimeout(this._syncTimer); this._syncTimer = null;
+    const S = this.state;
+    if (!S.currentProjectId || S.projectLoading) return;
+    if (!navigator.onLine) { this.setState({syncStatus:'offline'}); return; }
+    if (!S.backend.scriptUrl || !S.backend.connected) {
+      if (S.syncStatus !== 'offline') this.appendLog('No connected backend — working offline', 'warn');
+      this.setState({syncStatus:'offline'});
+      return;
+    }
+    if (S.syncStatus === 'conflict') { this.appendLog('Saving is paused until you reload the latest version', 'warn'); return; }
+    const queued = this._queued && this._queued.projectId === S.currentProjectId ? this._queued.revisionLabel : undefined;
+    const job = this.buildSyncJob(revisionLabel || queued);
+    // One save at a time: a second request with the same expectedVersion would
+    // conflict with our own first save. Keep only the latest pending job.
+    if (this._syncInFlight) { this._queued = job; return; }
+    this.sendSync(job);
+  }
+
+  sendSync(job){
+    this._syncInFlight = true;
+    const isCurrent = () => this.state.currentProjectId === job.projectId;
+    if (isCurrent()) this.setState({syncStatus:'saving'});
+    let ok = false;
+    this.api('update_project', { projectId: job.projectId, expectedVersion: this._versions[job.projectId] || 1, project: job.project,
+      revisionLabel: job.revisionLabel, createIfMissing: job.createIfMissing })
+      .then(res => {
+        if (res.ok) {
+          ok = true;
+          this._versions[job.projectId] = res.version;
+          this.setState(s => ({ lastSyncAt: new Date(), projects: s.projects.map(p => p.id === job.projectId
+            ? { ...p, local: false, value: job.project.value, updated: 'Just now', revisions: res.revisionNumber } : p) }));
+          this.appendLog('Saved v' + res.version + ' to Google Sheets' + (job.revisionLabel ? ' — ' + job.revisionLabel : ''), 'ok');
+          const stillDirty = !!(this._queued && this._queued.projectId === job.projectId);
+          if (isCurrent()) {
+            const dirty = stillDirty || this.dataSignature(this.state) !== job.sig;
+            const rev = { id: res.revisionId, label: res.revisionLabel, timestamp: res.savedAt, snapshot: null, restorable: !!res.hasSnapshot };
+            this.setState(s => ({ syncStatus: dirty ? 'saving' : 'saved', pendingChanges: dirty, conflictInfo: null, revisions: [rev, ...s.revisions].slice(0, 50) }));
+            this.writeCache(dirty);
+          } else if (!stillDirty) {
+            this.patchCache(job.projectId, { dirty: false, version: res.version });
+          }
+        } else if (res.conflict) {
+          if (isCurrent()) this.setState({ syncStatus:'conflict', conflictInfo: res });
+          this.appendLog('Conflict: ' + res.message, 'error');
+        } else {
+          if (isCurrent()) this.setState({syncStatus:'error'});
+          this.appendLog('Sync failed: ' + (res.error || 'unknown error'), 'error');
+        }
+      })
+      .catch(err => { if (isCurrent()) this.setState({syncStatus:'error'}); this.appendLog('Sync failed: ' + err, 'error'); })
+      .then(() => {
+        this._syncInFlight = false;
+        const q = this._queued; this._queued = null;
+        if (q && (ok || q.projectId !== job.projectId)) this.sendSync(q);
+      });
+  }
+
+  syncNow(){ this.performSync(); }
+
+  reloadLatest(){
+    this.setState({ conflictInfo:null, syncStatus:'saved', pendingChanges:false });
+    this.loadProject(this.state.currentProjectId, { keepScreen: true, fromServer: true });
+  }
+
+  /** Connection & project list **/
+
+  testConnection(){
+    const { scriptUrl, apiToken } = this.state.backend;
+    if (!scriptUrl) { this.appendLog('Enter a Web App URL first', 'warn'); return; }
+    if (!apiToken) { this.appendLog('Enter the API token first', 'warn'); return; }
+    this.saveBackendPrefs();
+    // list_projects needs the token, so this also verifies it (ping alone would not).
+    this.api('list_projects').then(res => {
+      if (res.ok) {
+        this.setState(s=>({backend:{...s.backend, connected:true}}));
+        this.appendLog('Connected to Google Sheets backend', 'ok');
+        this.flushPendingDeletes();
+        this.applyProjectList(res.projects || []);
+      } else {
+        this.setState(s=>({backend:{...s.backend, connected:false}}));
+        this.appendLog('Connection failed: ' + (res.error||'unknown error'), 'error');
+      }
+    }).catch(err => { this.setState(s=>({backend:{...s.backend, connected:false}})); this.appendLog('Connection failed: ' + err, 'error'); });
+  }
+
+  refreshProjectList(){
+    this.api('list_projects').then(res => {
+      if (res.ok) this.applyProjectList(res.projects || []);
+      else this.appendLog('Could not load project list: ' + res.error, 'error');
+    }).catch(err => this.appendLog('Could not load project list: ' + err, 'error'));
+  }
+
+  // The server list replaces the local one (including the demo rows). Projects created
+  // offline and not yet on the server are kept until their first save creates them.
+  applyProjectList(serverRows){
+    const pendingDeletes = this.pendingDeletes();
+    const server = serverRows.filter(p => pendingDeletes.indexOf(p.ProjectID) === -1).map(p => ({ id:p.ProjectID, name:p.ProjectName, type:p.BuildingType||'—', status:p.Status||'Draft',
+      value:Number(p.Value)||0, updated:p.UpdatedAt, owner:p.Owner||'—', location:p.Location||'—', revisions:0 }));
+    serverRows.forEach(p => { this._versions[p.ProjectID] = Math.max(this._versions[p.ProjectID] || 1, Number(p.Version) || 1); });
+    const localOnly = this.state.projects.filter(p => p.local && !server.some(sp => sp.id === p.id));
+    const projects = [...localOnly, ...server];
+    this.setState({ projects });
+    this.appendLog('Loaded ' + server.length + ' project(s) from Sheets', 'ok');
+    const cur = this.state.currentProjectId;
+    if (cur && projects.some(p => p.id === cur)) {
+      if (localOnly.some(p => p.id === cur)) { if (this.state.pendingChanges) this.performSync(); }
+      else this.loadProject(cur, { keepScreen: true });
+    } else if (projects.length) {
+      this.loadProject(projects[0].id, { keepScreen: true });
+    } else {
+      this.setState({ ...this.blankProjectData(), currentProjectId: null, pendingChanges: false, syncStatus: 'saved' });
+      try { localStorage.setItem('qb_current', ''); } catch (e) {}
+      this.resetBaseline(false);
+    }
+  }
+
+  loadProject(id, opts){
+    opts = opts || {};
+    const S = this.state;
+    // Flush unsaved edits for the project we're leaving (queued if a save is in flight).
+    if (S.pendingChanges && id !== S.currentProjectId) this.performSync();
+    const meta = S.projects.find(p => p.id === id) || {};
+    const cached = this.readCache(id);
+    const fetchServer = S.backend.connected && !meta.local && !(cached && cached.dirty && !opts.fromServer);
+    this.setState({ ...this.blankProjectData(), ...(cached ? { ...cached.data, revisions: cached.revisions } : {}),
+      currentProjectId: id, screen: opts.keepScreen ? S.screen : 'estimator', projectLoading: fetchServer,
+      pendingChanges: !!(cached && cached.dirty && !opts.fromServer) });
+    try { localStorage.setItem('qb_current', id); } catch (e) {}
+
+    if (!fetchServer) {
+      this.resetBaseline(cached && cached.dirty);
+      if (S.backend.connected && this.state.pendingChanges) {
+        this.appendLog('Opened project with unsynced local changes — saving them now', 'warn');
+        this.performSync();
+      } else {
+        this.setState({ syncStatus: S.backend.connected ? 'saved' : 'offline' });
+        this.appendLog(cached ? 'Opened project (offline copy)' : 'Opened project (no local copy yet)', cached ? 'ok' : 'warn');
+      }
+      return;
+    }
+    this.api('get_project', { projectId: id })
+      .then(res => {
+        if (this.state.currentProjectId !== id) return;
+        if (res.ok) {
+          this._versions[id] = Number(res.project.Version) || 1;
+          this.setState({ ...this.fromServerBundle(res), projectLoading: false, loadError: null, syncStatus: 'saved', pendingChanges: false });
+          this.resetBaseline(false);
+          this.appendLog('Loaded project from Google Sheets', 'ok');
+        } else {
+          this.setState({ projectLoading: false, loadError: res.error || 'unknown error' });
+          this.resetBaseline(false);
+          this.appendLog('Load failed: ' + res.error, 'error');
+        }
+      })
+      .catch(err => {
+        if (this.state.currentProjectId !== id) return;
+        this.setState({ projectLoading: false, loadError: String(err) });
+        this.resetBaseline(false);
+        this.appendLog('Load failed: ' + err, 'error');
+      });
+  }
+
+  createNewProject(){
+    const S = this.state;
+    if (S.pendingChanges) this.performSync();
+    const { connected } = S.backend;
+    const localId = 'p' + Date.now();
+    const baseProject = { id: localId, name:'Untitled Project', type:'Residential', status:'Draft', value:0, updated:'Just now', owner: S.company.name, location:'', revisions:0, local: true };
+    this._versions[localId] = 1;
+    this.setState(s => ({ ...this.blankProjectData(), projects: [baseProject, ...s.projects], currentProjectId: localId, screen: 'estimator',
+      projectLoading: false, pendingChanges: false, syncStatus: connected ? 'saved' : 'offline' }));
+    try { localStorage.setItem('qb_current', localId); } catch (e) {}
+    this.resetBaseline(false);
+    if (connected) {
+      this.api('create_project', { project: { name: baseProject.name, owner: baseProject.owner, type: baseProject.type, status: baseProject.status, clientGeneratedId: localId } })
+        .then(res => {
+          if (res.ok) {
+            this._versions[localId] = Math.max(this._versions[localId] || 1, Number(res.version) || 1);
+            this.setState(s => ({ projects: s.projects.map(p => p.id === localId ? { ...p, local: false } : p) }));
+            this.appendLog('Created project in Google Sheets', 'ok');
+          } else this.appendLog('Create failed: ' + res.error + ' — will retry on first save', 'error');
+        })
+        .catch(err => this.appendLog('Create failed: ' + err + ' — will retry on first save', 'error'));
+    } else {
+      this.appendLog('Created project locally (will sync once connected)', 'warn');
+    }
+  }
+
+  /** Delete / trash **/
+
+  pendingDeletes(){
+    try { return JSON.parse(localStorage.getItem('qb_pending_deletes') || '[]'); } catch (e) { return []; }
+  }
+  setPendingDeletes(ids){ try { localStorage.setItem('qb_pending_deletes', JSON.stringify(ids)); } catch (e) {} }
+
+  flushPendingDeletes(){
+    this.pendingDeletes().forEach(id => {
+      this.api('delete_project', { projectId: id }).then(res => {
+        if (res.ok || res.error === 'Project not found') {
+          this.setPendingDeletes(this.pendingDeletes().filter(x => x !== id));
+          if (res.ok) this.appendLog('Synced offline deletion to Sheets', 'ok');
+        }
+      }).catch(() => {});
+    });
+  }
+
+  deleteProject(id, name){
+    if (!window.confirm('Delete "' + name + '"? It can be restored from Trash afterward.')) return;
+    const S = this.state;
+    const meta = S.projects.find(p => p.id === id) || {};
+    this.setState(s => ({ projects: s.projects.filter(p => p.id !== id) }));
+    if (id === S.currentProjectId) {
+      clearTimeout(this._syncTimer); this._syncTimer = null;
+      this.setState({ ...this.blankProjectData(), currentProjectId: null, pendingChanges: false });
+      try { localStorage.setItem('qb_current', ''); } catch (e) {}
+      this.resetBaseline(false);
+    }
+    if (meta.local) {
+      try { localStorage.removeItem('qb_project_' + id); } catch (e) {}
+      this.appendLog('Deleted unsynced local project', 'ok');
+      return;
+    }
+    if (S.backend.connected) {
+      this.api('delete_project', { projectId: id })
+        .then(res => { if (res.ok) { this.appendLog('Project moved to Trash', 'ok'); this.fetchTrash(); } else this.appendLog('Delete failed: ' + res.error, 'error'); })
+        .catch(err => { this.setPendingDeletes([...this.pendingDeletes(), id]); this.appendLog('Delete failed: ' + err + ' — will retry when connected', 'error'); });
+    } else {
+      this.setPendingDeletes([...this.pendingDeletes(), id]);
+      this.appendLog('Deleted locally — will sync the deletion once connected to Sheets', 'warn');
+    }
+  }
+
+  fetchTrash(){
+    if (!this.state.backend.connected) return;
+    this.api('list_projects', { includeDeleted: true }).then(res => {
+      if (res.ok) this.setState({ trashedProjects: res.projects.filter(p => p.IsDeleted === true || p.IsDeleted === 'TRUE' || p.IsDeleted === 'true').map(p => ({ id:p.ProjectID, name:p.ProjectName })) });
+    }).catch(()=>{});
+  }
+
+  restoreProjectFromTrash(id){
+    this.api('restore_project', { projectId: id })
+      .then(res => {
+        if (res.ok) { this.appendLog('Project restored', 'ok'); this.fetchTrash(); this.refreshProjectList(); }
+        else this.appendLog('Restore failed: ' + res.error, 'error');
+      }).catch(err => this.appendLog('Restore failed: ' + err, 'error'));
+  }
+
+  migrateLocalData(){
+    if (!this.state.backend.connected) { this.appendLog('Connect to Google Sheets before migrating', 'warn'); return; }
+    const entries = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.indexOf('qb_project_') === 0) {
+        try {
+          const id = key.replace('qb_project_','');
+          const raw = JSON.parse(localStorage.getItem(key));
+          const snap = this.snapshotToState(raw);
+          entries.push({ clientGeneratedId: id, project: this.payloadFromSnapshot(snap, { name: raw.name || ('Migrated Project (' + id + ')') }) });
+        } catch (e) {}
+      }
+    }
+    if (!entries.length) { this.appendLog('No local offline projects found to migrate', 'warn'); return; }
+    this.api('migrate_push', { localProjects: entries })
+      .then(res => {
+        if (res.ok) { this.appendLog('Migration: ' + res.results.map(r=>r.status).join(', '), 'ok'); this.refreshProjectList(); }
+        else this.appendLog('Migration failed: ' + res.error, 'error');
+      }).catch(err => this.appendLog('Migration failed: ' + err, 'error'));
+  }
+
+  runHealthCheck(){
+    if (!this.state.backend.connected) { this.appendLog('Connect to Google Sheets first', 'warn'); return; }
+    this.api('health_check').then(res => {
+      if (res.ok) { this.setState({ dbHealth: res }); this.appendLog('Health check OK', 'ok'); }
+      else this.appendLog('Health check failed: ' + res.error, 'error');
+    }).catch(err => this.appendLog('Health check failed: ' + err, 'error'));
+  }
+
+  /** Revisions **/
+
+  // Connected: a labelled save on the server (stored with a full snapshot, so it can be
+  // restored later from any browser). Offline: a local-only snapshot in this browser.
+  saveRevision(){
+    const S = this.state;
+    if (!S.currentProjectId) { this.appendLog('Open or create a project first', 'warn'); return; }
+    const label = 'Manual revision — ' + new Date().toLocaleString();
+    if (S.backend.connected && navigator.onLine) {
+      this.appendLog('Saving ' + label + '…', 'ok');
+      this.performSync(label);
+      return;
+    }
+    const rev = { id: 'local-' + Date.now(), label: label + ' (local only)', timestamp: new Date().toISOString(), snapshot: this.projectSnapshot(S), restorable: true };
+    this.setState(s => ({ revisions: [rev, ...s.revisions] }));
+    this.writeCache(this.state.pendingChanges);
+    this.appendLog('Saved ' + rev.label, 'ok');
+  }
+
+  restoreRevision(rev){
+    const S = this.state;
+    if (!rev.restorable) { this.appendLog('"' + rev.label + '" has no stored snapshot (saved before snapshots were added) — cannot restore', 'warn'); return; }
+    if (!window.confirm('Restore "' + rev.label + '"? The current BOQ, prices and cost summary will be replaced. The current state stays in the revision history.')) return;
+    if (rev.snapshot) {
+      this.setState(this.snapshotToState(rev.snapshot));
+      this.appendLog('Restored ' + rev.label, 'ok');
+      return;
+    }
+    if (!S.backend.connected) { this.appendLog('Connect to Google Sheets to restore a server revision', 'warn'); return; }
+    const pid = S.currentProjectId;
+    this.appendLog('Restoring ' + rev.label + '…', 'ok');
+    this.api('restore_revision', { projectId: pid, revisionId: rev.id })
+      .then(res => {
+        if (this.state.currentProjectId !== pid) return;
+        if (res.ok && res.snapshot) {
+          // Applying it triggers a normal autosave, which records the restore as a new revision.
+          this.setState(this.snapshotToState(res.snapshot));
+          this.appendLog('Restored ' + rev.label + ' — saving as a new revision', 'ok');
+        } else this.appendLog('Restore failed: ' + (res.error || 'no snapshot returned'), 'error');
+      })
+      .catch(err => this.appendLog('Restore failed: ' + err, 'error'));
+  }
+
+  /** Export **/
+
+  exportToExcel(){
+    const S = this.state;
+    // Formula-injection guard: Excel/Sheets evaluate cells starting with = + - @.
+    const cell = c => { let v = String(c); if (/^[=+\-@\t\r]/.test(v)) v = "'" + v; return '"' + v.replace(/"/g,'""') + '"'; };
+    const rows = [['Item','Qty','Unit','Mode','Material Cost','Labor Cost','Line Total']];
+    S.boq.forEach(r => rows.push([r.label, r.qtyLabel, r.unit||'', r.mode, this.nn(r.materialCost).toFixed(2), this.nn(r.laborCost).toFixed(2), (this.nn(r.materialCost)+this.nn(r.laborCost)).toFixed(2)]));
+    const csv = rows.map(r => r.map(cell).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob); link.download = 'BOQ_' + (S.currentProjectId || 'export') + '.csv';
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  }
+
+  exportReport(){
+    if (this.state.reportSettings.format === 'xls') this.exportToExcel();
+    else window.print();
+  }
+
+  /** Calculator **/
+
+  // Negative inputs are clamped to 0. Wastage inflates MATERIAL quantities only;
+  // pakyaw labor is paid on the net (un-wasted) quantity for every work type,
+  // and the BOQ quantity is the net quantity.
+  computeCalc(){
+    const wt = this.state.workType, f = this.state[wt];
+    const p = v => this.nn(v);
+    let rows = [], materialCost = 0, laborCost = 0, unit = 'sqm', qtyUnit = 'sqm', qtyBase = 0, qtyLabel = '', desc = '';
+    const waste = 1 + p(f.wastage)/100;
+    const supply = f.mode === 'supplyInstall';
+    const rate = p(f.pakyawRate);
+    if (wt === 'chb') {
+      const area = Math.max(0, p(f.length)*p(f.height) - p(f.openingsArea));
+      const blocks = area*p(f.blockCoeff)*waste, cement = area*p(f.cementCoeff)*waste, sand = area*p(f.sandCoeff)*waste;
+      rows = [ {label:'Wall Area', value: area.toFixed(2)+' sqm'}, {label:'CHB Blocks', value: Math.ceil(blocks)+' pcs'}, {label:'Cement', value: cement.toFixed(2)+' bags'}, {label:'Sand', value: sand.toFixed(2)+' cu.m'} ];
+      materialCost = supply ? 0 : blocks*p(f.blockPrice) + cement*p(f.cementPrice) + sand*p(f.sandPrice);
+      laborCost = area*rate; unit = 'sqm'; qtyUnit = 'sqm'; qtyBase = area; qtyLabel = area.toFixed(2)+' sqm';
+      desc = 'CHB Wall, '+f.thickness+'in — '+area.toFixed(1)+' sqm';
+    } else if (wt === 'rebar') {
+      const d = p(f.diameter), unitWeight = (d*d)/162, length = p(f.totalLength);
+      const netKg = length*unitWeight, totalKg = netKg*waste;
+      rows = [ {label:'Unit Weight', value: unitWeight.toFixed(3)+' kg/m'}, {label:'Net Weight', value: netKg.toFixed(2)+' kg'}, {label:'Weight incl. Wastage', value: totalKg.toFixed(2)+' kg'} ];
+      materialCost = supply ? 0 : totalKg*p(f.unitPriceKg);
+      const basis = f.rateUnit === 'lm' ? length : netKg;
+      laborCost = basis*rate; unit = f.rateUnit; qtyUnit = 'kg'; qtyBase = netKg; qtyLabel = netKg.toFixed(1)+' kg';
+      desc = 'Rebar Ø'+f.diameter+'mm — '+netKg.toFixed(1)+' kg';
+    } else if (wt === 'concrete') {
+      const netVol = p(f.length)*p(f.width)*p(f.thickness), vol = netVol*waste;
+      const cement = vol*p(f.cementCoeff), sand = vol*p(f.sandCoeff), gravel = vol*p(f.gravelCoeff);
+      rows = [ {label:'Net Volume', value: netVol.toFixed(2)+' cu.m'}, {label:'Volume incl. Wastage', value: vol.toFixed(2)+' cu.m'}, {label:'Cement', value: cement.toFixed(2)+' bags'}, {label:'Sand', value: sand.toFixed(2)+' cu.m'}, {label:'Gravel', value: gravel.toFixed(2)+' cu.m'} ];
+      materialCost = supply ? 0 : cement*p(f.cementPrice) + sand*p(f.sandPrice) + gravel*p(f.gravelPrice);
+      laborCost = netVol*rate; unit = 'cu.m'; qtyUnit = 'cu.m'; qtyBase = netVol; qtyLabel = netVol.toFixed(2)+' cu.m';
+      desc = 'Concrete Class '+f.mixClass+' — '+netVol.toFixed(2)+' cu.m';
+    } else if (wt === 'plaster') {
+      const netArea = p(f.length)*p(f.height)*p(f.sides), area = netArea*waste;
+      const cement = area*p(f.cementCoeff), sand = area*p(f.sandCoeff);
+      rows = [ {label:'Plastered Area', value: netArea.toFixed(2)+' sqm'}, {label:'Area incl. Wastage', value: area.toFixed(2)+' sqm'}, {label:'Cement', value: cement.toFixed(2)+' bags'}, {label:'Sand', value: sand.toFixed(2)+' cu.m'} ];
+      materialCost = supply ? 0 : cement*p(f.cementPrice) + sand*p(f.sandPrice);
+      laborCost = netArea*rate; unit = 'sqm'; qtyUnit = 'sqm'; qtyBase = netArea; qtyLabel = netArea.toFixed(2)+' sqm';
+      desc = 'Plastering, '+(f.sides==='2'?'2 sides':'1 side')+' — '+netArea.toFixed(1)+' sqm';
+    } else if (wt === 'gypsum') {
+      const netArea = p(f.area), area = netArea*waste;
+      const boards = area*p(f.boardCoeff), furring = area*p(f.furringCoeff), screws = area*p(f.screwCoeff);
+      rows = [ {label:'Area', value: netArea.toFixed(2)+' sqm'}, {label:'Area incl. Wastage', value: area.toFixed(2)+' sqm'}, {label:'Gypsum Boards', value: Math.ceil(boards)+' pcs'}, {label:'Metal Furring', value: furring.toFixed(1)+' lm'}, {label:'Screws', value: Math.ceil(screws)+' pcs'} ];
+      materialCost = supply ? 0 : boards*p(f.boardPrice) + furring*p(f.furringPrice) + screws*p(f.screwPrice);
+      laborCost = netArea*rate; unit = 'sqm'; qtyUnit = 'sqm'; qtyBase = netArea; qtyLabel = netArea.toFixed(2)+' sqm';
+      desc = 'Gypsum '+(f.type==='partition'?'Partition':'Ceiling')+' — '+netArea.toFixed(1)+' sqm';
+    } else if (wt === 'paint') {
+      const area = p(f.area), coverage = Math.max(1, p(f.coverage));
+      const liters = (area*p(f.coats)/coverage)*waste;
+      const primerLiters = f.primer === 'yes' ? (area/coverage)*waste : 0;
+      rows = [ {label:'Area', value: area.toFixed(2)+' sqm'}, {label:'Paint Needed', value: liters.toFixed(2)+' L'}, {label:'Primer Needed', value: primerLiters.toFixed(2)+' L'} ];
+      materialCost = supply ? 0 : liters*p(f.paintPrice) + primerLiters*p(f.primerPrice);
+      laborCost = area*rate; unit = 'sqm'; qtyUnit = 'sqm'; qtyBase = area; qtyLabel = area.toFixed(2)+' sqm';
+      desc = 'Painting, '+f.coats+' coats — '+area.toFixed(1)+' sqm';
+    }
+    return { rows, materialCost, laborCost, materialCostFmt: this.peso(materialCost), laborCostFmt: this.peso(laborCost), lineTotalFmt: this.peso(materialCost+laborCost), unit, qtyUnit, qtyBase, qtyLabel, desc, mode: f.mode };
+  }
+
+  addToBoq(){
+    if (!this.state.currentProjectId) { this.appendLog('Open or create a project before adding BOQ items', 'warn'); return; }
+    const calc = this.computeCalc();
+    if (calc.qtyBase <= 0) return;
+    // Ignore an identical line added again within a moment (double click / double tap).
+    const sig = JSON.stringify([this.state.workType, calc.desc, calc.materialCost, calc.laborCost, calc.mode]);
+    const now = Date.now();
+    if (this._lastAdd && this._lastAdd.sig === sig && now - this._lastAdd.at < 800) return;
+    this._lastAdd = { sig, at: now };
+    const id = this.state.boqSeq;
+    this.setState(s => ({
+      boq: [...s.boq, { id, workType: s.workType, label: calc.desc, qtyLabel: calc.qtyLabel, unit: calc.qtyUnit, materialCost: calc.materialCost, laborCost: calc.laborCost, mode: calc.mode }],
+      boqSeq: id + 1,
+    }));
+  }
+  removeBoqRow(id){ this.setState(s => ({ boq: s.boq.filter(r => r.id !== id) })); }
+
+  renderVals() {
+    const S = this.state;
+    const navDefs = [
+      {key:'dashboard', label:'Dashboard'}, {key:'projects', label:'Projects'}, {key:'estimator', label:'Estimator'},
+      {key:'boq', label:'Bill of Quantities'}, {key:'library', label:'Cost Library'}, {key:'reports', label:'Reports'}, {key:'settings', label:'Settings'},
+    ];
+    const navItems = navDefs.map(it => ({
+      label: it.label,
+      onClick: () => this.setState({screen: it.key}),
+      dotColor: S.screen===it.key ? '#fff' : 'oklch(0.4 0.03 255)',
+      weight: S.screen===it.key ? 700 : 500,
+      style: `display:flex;align-items:center;gap:10px;padding:10px 20px;cursor:pointer;color:${S.screen===it.key?'#fff':'oklch(0.72 0.02 255)'};background:${S.screen===it.key?'oklch(0.28 0.08 255)':'transparent'};`,
+    }));
+
+    const workTypeDefs = [
+      {key:'chb', label:'CHB Wall'}, {key:'rebar', label:'Rebar'}, {key:'concrete', label:'Concrete'},
+      {key:'plaster', label:'Plastering'}, {key:'gypsum', label:'Gypsum'}, {key:'paint', label:'Painting'},
+    ];
+    const workTypeTabs = workTypeDefs.map(t => ({
+      label: t.label,
+      onClick: () => this.setState({workType: t.key}),
+      style: `padding:9px 16px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid ${S.workType===t.key?'oklch(0.28 0.06 255)':'oklch(0.89 0.01 255)'};background:${S.workType===t.key?'oklch(0.28 0.06 255)':'#fff'};color:${S.workType===t.key?'#fff':'oklch(0.3 0.02 255)'};`,
+    }));
+
+    const labelStyle = 'display:block;font-size:11.5px;font-weight:600;color:oklch(0.5 0.02 255);margin-bottom:6px;';
+    const inputStyle = 'width:100%;box-sizing:border-box;border:1px solid oklch(0.85 0.01 255);border-radius:7px;padding:9px 11px;font-size:13.5px;color:oklch(0.22 0.015 255);';
+    const inputStyleSmall = 'width:60px;box-sizing:border-box;border:1px solid oklch(0.85 0.01 255);border-radius:7px;padding:9px 11px;font-size:13.5px;';
+    const inputStyleRight = 'width:140px;box-sizing:border-box;border:1px solid oklch(0.85 0.01 255);border-radius:7px;padding:8px 11px;font-size:13px;text-align:right;';
+
+    const pill = (active) => `padding:8px 14px;border-radius:7px;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid ${active?'oklch(0.28 0.06 255)':'oklch(0.89 0.01 255)'};background:${active?'oklch(0.28 0.06 255)':'#fff'};color:${active?'#fff':'oklch(0.3 0.02 255)'};`;
+
+    const f = S[S.workType];
+    const h = {};
+    ['length','height','openingsArea','wastage','blockCoeff','cementCoeff','sandCoeff','blockPrice','cementPrice','sandPrice','pakyawRate',
+     'diameter','totalLength','unitPriceKg','width','thickness','gravelCoeff','gravelPrice','area','boardCoeff','furringCoeff','screwCoeff',
+     'boardPrice','furringPrice','screwPrice','coats','coverage','paintPrice','primerPrice'].forEach(field => { h[field] = this.makeHandler(S.workType, field); });
+
+    const calc = this.computeCalc();
+
+    const screenTitles = {dashboard:'Dashboard', projects:'Projects', estimator:'Estimator', boq:'Bill of Quantities', library:'Cost Library', reports:'Reports', settings:'Settings'};
+
+    const summary = S.summary;
+    const h2 = {
+      equipment: e => this.setState(s => ({summary:{...s.summary, equipment:e.target.value}})),
+      delivery: e => this.setState(s => ({summary:{...s.summary, delivery:e.target.value}})),
+      overheadPct: e => this.setState(s => ({summary:{...s.summary, overheadPct:e.target.value}})),
+      contingencyPct: e => this.setState(s => ({summary:{...s.summary, contingencyPct:e.target.value}})),
+      profitPct: e => this.setState(s => ({summary:{...s.summary, profitPct:e.target.value}})),
+      taxPct: e => this.setState(s => ({summary:{...s.summary, taxPct:e.target.value}})),
+    };
+
+    const { materialsSubtotal, laborSubtotal, overheadAmt, contingencyAmt, profitAmt, taxAmt, grandTotal } = this.computeTotals(S);
+
+    const summaryRows = [
+      {label:'Materials Subtotal', value: this.peso(materialsSubtotal)},
+      {label:'Pakyaw Labor Subtotal', value: this.peso(laborSubtotal)},
+      {label:'Equipment', value: this.peso(this.nn(summary.equipment))},
+      {label:'Delivery', value: this.peso(this.nn(summary.delivery))},
+      {label:'Overhead ('+this.nn(summary.overheadPct)+'%)', value: this.peso(overheadAmt)},
+      {label:'Contingency ('+this.nn(summary.contingencyPct)+'%)', value: this.peso(contingencyAmt)},
+      {label:'Profit ('+this.nn(summary.profitPct)+'%)', value: this.peso(profitAmt)},
+    ];
+    if (summary.taxEnabled) summaryRows.push({label:'VAT ('+this.nn(summary.taxPct)+'%)', value: this.peso(taxAmt)});
+
+    const boqRows = S.boq.map(r => ({
+      label: r.label, qtyLabel: r.qtyLabel,
+      modeLabel: r.mode === 'supplyInstall' ? 'Supply & Install' : 'Labor Only',
+      modeBadge: `display:inline-block;padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;background:${r.mode==='supplyInstall'?'oklch(0.95 0.03 155)':'oklch(0.95 0.015 255)'};color:${r.mode==='supplyInstall'?'oklch(0.4 0.1 155)':'oklch(0.4 0.02 255)'};`,
+      materialFmt: r.materialCost>0 ? this.peso(r.materialCost) : (r.mode === 'supplyInstall' ? 'Included' : this.peso(0)),
+      laborFmt: this.peso(r.laborCost),
+      totalFmt: this.peso(r.materialCost+r.laborCost),
+      remove: () => this.removeBoqRow(r.id),
+    }));
+
+    const h3 = {
+      companyName: e => this.setState(s=>({company:{...s.company, name:e.target.value}})),
+      companyAddress: e => this.setState(s=>({company:{...s.company, address:e.target.value}})),
+      companyContact: e => this.setState(s=>({company:{...s.company, contact:e.target.value}})),
+      terms: e => this.setState(s=>({reportSettings:{...s.reportSettings, terms:e.target.value}})),
+    };
+    const h4 = {
+      // Changing either one requires reconnecting, which re-verifies the token.
+      scriptUrl: e => this.setState(s=>({backend:{...s.backend, scriptUrl:e.target.value.trim(), connected:false}})),
+      apiToken: e => this.setState(s=>({backend:{...s.backend, apiToken:e.target.value.trim(), connected:false}})),
+    };
+    const toggleRememberToken = () => { this.setState(s=>({backend:{...s.backend, rememberToken: !s.backend.rememberToken}})); this.saveBackendPrefs(); };
+
+    const libMaterials = S.libMaterials.map((m,i) => ({ ...m, onChange: e => this.setState(s=>{ const arr=[...s.libMaterials]; arr[i]={...arr[i],price:e.target.value}; return {libMaterials:arr}; }) }));
+    const libLabor = S.libLabor.map((l,i) => ({ ...l,
+      onChangeLO: e => this.setState(s=>{ const arr=[...s.libLabor]; arr[i]={...arr[i],laborOnly:e.target.value}; return {libLabor:arr}; }),
+      onChangeSI: e => this.setState(s=>{ const arr=[...s.libLabor]; arr[i]={...arr[i],supplyInstall:e.target.value}; return {libLabor:arr}; }),
+    }));
+
+    const badge = (bg,fg) => `padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;background:${bg};color:${fg};`;
+    const badgeInProgress = badge('oklch(0.94 0.03 255)','oklch(0.4 0.12 255)');
+    const statusBadges = { 'In Progress': badgeInProgress, 'For Review': badge('oklch(0.96 0.03 70)','oklch(0.45 0.1 70)'), 'Draft': badge('oklch(0.95 0.01 255)','oklch(0.5 0.02 255)'), 'Approved': badge('oklch(0.95 0.03 155)','oklch(0.4 0.1 155)') };
+    const fmtVal = v => '₱' + this.n(v).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
+    const projectsList = S.projects.map(p => ({
+      ...p, value: fmtVal(p.value), badgeStyle: statusBadges[p.status] || statusBadges['Draft'],
+      currentTag: p.id === S.currentProjectId ? '  ·  current' : '',
+      rowStyle: `border-top:1px solid oklch(0.94 0.01 255);cursor:pointer;${p.id===S.currentProjectId?'background:oklch(0.98 0.015 255);':''}`,
+      open: () => this.loadProject(p.id),
+      remove: (e) => { e.stopPropagation(); this.deleteProject(p.id, p.name); },
+    }));
+    const recentProjects = projectsList.slice(0,5);
+
+    const kpis = [
+      {label:'Active Projects', value: String(S.projects.length), sub:'+2 this month', subColor:'oklch(0.55 0.13 155)'},
+      {label:'Pipeline Value', value: fmtVal(S.projects.reduce((a,p)=>a+p.value,0)), sub:'Across '+S.projects.length+' estimates', subColor:'oklch(0.55 0.02 255)'},
+      {label:'Pending Approvals', value:'3', sub:'Awaiting client sign-off', subColor:'oklch(0.6 0.13 70)'},
+      {label:'Last Sheets Sync', value: S.lastSyncAt ? S.lastSyncAt.toLocaleTimeString() : 'Not yet', sub: S.backend.connected ? 'Backend connected' : 'Connect in Settings', subColor: S.backend.connected ? 'oklch(0.55 0.13 155)' : 'oklch(0.58 0.15 25)'},
+    ];
+
+    const sheetMapping = [
+      {app:'Project Name', sheet:"Sheet 'Projects'"}, {app:'BOQ Line Items', sheet:"Sheet 'BOQ'"},
+      {app:'Cost Summary', sheet:"Sheet 'CostSummary'"}, {app:'Revision Log', sheet:"Sheet 'Revisions'"},
+    ];
+    const syncLog = S.syncLogEntries.length ? S.syncLogEntries : [ {text:'No sync activity yet', dotColor:'oklch(0.7 0.01 255)', time:'—'} ];
+    const fmtTime = t => { const d = new Date(t); return isNaN(d.getTime()) ? String(t || '') : d.toLocaleString(); };
+    const revisionsList = S.revisions.slice(0, 30).map(r => ({ ...r, timestamp: fmtTime(r.timestamp),
+      restoreLabel: r.restorable ? 'Restore' : 'No snapshot',
+      restoreStyle: r.restorable ? 'cursor:pointer;color:oklch(0.4 0.1 255);font-size:12px;font-weight:600;' : 'color:oklch(0.65 0.01 255);font-size:12px;',
+      restore: () => this.restoreRevision(r) }));
+    const currentMeta = S.projects.find(p=>p.id===S.currentProjectId);
+
+    return {
+      screen: S.screen, screenTitle: screenTitles[S.screen], autosaveTime:'just now',
+      isDashboard: S.screen==='dashboard', isProjects: S.screen==='projects', isEstimator: S.screen==='estimator',
+      isBoq: S.screen==='boq', isLibrary: S.screen==='library', isReports: S.screen==='reports', isSettings: S.screen==='settings',
+      goEstimator: () => this.setState({screen:'estimator'}), goReports: () => this.setState({screen:'reports'}),
+      navItems, kpis, recentProjects, projectsList,
+      workTypeTabs, isChb: S.workType==='chb', isRebar: S.workType==='rebar', isConcrete: S.workType==='concrete',
+      isPlaster: S.workType==='plaster', isGypsum: S.workType==='gypsum', isPaint: S.workType==='paint',
+      f, h, labelStyle, inputStyle, inputStyleSmall, inputStyleRight, calc,
+      isSupplyMode: f.mode === 'supplyInstall',
+      chbThickStyle4: pill(f.thickness==='4'), chbThickStyle6: pill(f.thickness==='6'), chbThickStyle8: pill(f.thickness==='8'),
+      setThickness4: () => this.updateForm('chb','thickness','4'), setThickness6: () => this.updateForm('chb','thickness','6'), setThickness8: () => this.updateForm('chb','thickness','8'),
+      rateUnitStyleKg: pill(f.rateUnit==='kg'), rateUnitStyleLm: pill(f.rateUnit==='lm'),
+      setRateUnitKg: () => this.updateForm('rebar','rateUnit','kg'), setRateUnitLm: () => this.updateForm('rebar','rateUnit','lm'),
+      classStyleA: pill(f.mixClass==='A'), classStyleB: pill(f.mixClass==='B'), classStyleC: pill(f.mixClass==='C'),
+      setClassA: () => this.setState(s=>({concrete:{...s.concrete, mixClass:'A', cementCoeff:'9.0', sandCoeff:'0.5', gravelCoeff:'1.0'}})),
+      setClassB: () => this.setState(s=>({concrete:{...s.concrete, mixClass:'B', cementCoeff:'7.5', sandCoeff:'0.5', gravelCoeff:'1.0'}})),
+      setClassC: () => this.setState(s=>({concrete:{...s.concrete, mixClass:'C', cementCoeff:'6.0', sandCoeff:'0.5', gravelCoeff:'1.0'}})),
+      sidesStyle1: pill(f.sides==='1'), sidesStyle2: pill(f.sides==='2'),
+      setSides1: () => this.updateForm('plaster','sides','1'), setSides2: () => this.updateForm('plaster','sides','2'),
+      gypTypeStyleCeiling: pill(f.type==='ceiling'), gypTypeStylePartition: pill(f.type==='partition'),
+      setTypeCeiling: () => this.setState(s=>({gypsum:{...s.gypsum, type:'ceiling', boardCoeff:'0.36'}})),
+      setTypePartition: () => this.setState(s=>({gypsum:{...s.gypsum, type:'partition', boardCoeff:'0.72'}})),
+      primerStyleYes: pill(f.primer==='yes'), primerStyleNo: pill(f.primer==='no'),
+      setPrimerYes: () => this.updateForm('paint','primer','yes'), setPrimerNo: () => this.updateForm('paint','primer','no'),
+      modeStyleLaborOnly: pill(f.mode==='laborOnly'), modeStyleSupply: pill(f.mode==='supplyInstall'),
+      setModeLaborOnly: () => this.updateForm(S.workType,'mode','laborOnly'), setModeSupply: () => this.updateForm(S.workType,'mode','supplyInstall'),
+      addToBoq: () => this.addToBoq(),
+      boqCountNote: S.boq.length>0 ? S.boq.length+' item(s) currently in BOQ.' : 'Add your first item to start building the BOQ.',
+      boqRows, boqEmpty: S.boq.length===0,
+      summary, h2, summaryRows, grandTotalFmt: this.peso(grandTotal),
+      taxToggleStyle: `width:34px;height:19px;border-radius:10px;background:${summary.taxEnabled?'oklch(0.55 0.13 155)':'oklch(0.88 0.01 255)'};cursor:pointer;position:relative;padding:2px;box-sizing:border-box;`,
+      taxKnobStyle: `width:15px;height:15px;border-radius:50%;background:#fff;transform:translateX(${summary.taxEnabled?'15px':'0'});transition:transform 0.15s;`,
+      toggleTax: () => this.setState(s=>({summary:{...s.summary, taxEnabled: !s.summary.taxEnabled}})),
+      libMaterials, libLabor,
+      company: S.company, reportSettings: {...S.reportSettings, formatLabel: S.reportSettings.format==='pdf'?'PDF':'Excel'}, h3,
+      formatStylePdf: pill(S.reportSettings.format==='pdf'), formatStyleXls: pill(S.reportSettings.format==='xls'),
+      setFormatPdf: () => this.setState(s=>({reportSettings:{...s.reportSettings, format:'pdf'}})),
+      setFormatXls: () => this.setState(s=>({reportSettings:{...s.reportSettings, format:'xls'}})),
+      sigToggleStyle: `width:34px;height:19px;border-radius:10px;background:${S.reportSettings.includeSignature?'oklch(0.55 0.13 155)':'oklch(0.88 0.01 255)'};cursor:pointer;position:relative;padding:2px;box-sizing:border-box;`,
+      sigKnobStyle: `width:15px;height:15px;border-radius:50%;background:#fff;transform:translateX(${S.reportSettings.includeSignature?'15px':'0'});transition:transform 0.15s;`,
+      toggleSignature: () => this.setState(s=>({reportSettings:{...s.reportSettings, includeSignature: !s.reportSettings.includeSignature}})),
+      noop: () => {},
+      backend: S.backend, h4,
+      sheetsStatusBadge: `padding:3px 10px;border-radius:5px;font-size:11px;font-weight:700;background:${S.backend.connected?'oklch(0.95 0.03 155)':'oklch(0.95 0.015 255)'};color:${S.backend.connected?'oklch(0.4 0.1 155)':'oklch(0.5 0.02 255)'};`,
+      sheetsStatusLabel: S.backend.connected ? 'Connected' : 'Not Connected',
+      sheetsConnectLabel: S.backend.connected ? 'Reconnect' : 'Connect',
+      connectSheets: () => this.testConnection(),
+      sheetMapping, syncLog, revisionsList, revisionsEmpty: S.revisions.length===0,
+      currentProjectName: S.currentProjectId ? ((currentMeta||{}).name || 'Untitled') : 'No project open',
+      noProject: !S.currentProjectId,
+      projectLoading: S.projectLoading, hasLoadError: !!S.loadError, loadError: S.loadError,
+      dismissLoadError: () => this.setState({ loadError: null }),
+      toggleRememberToken,
+      rememberToggleStyle: `width:34px;height:19px;border-radius:10px;background:${S.backend.rememberToken?'oklch(0.55 0.13 155)':'oklch(0.88 0.01 255)'};cursor:pointer;position:relative;padding:2px;box-sizing:border-box;flex-shrink:0;`,
+      rememberKnobStyle: `width:15px;height:15px;border-radius:50%;background:#fff;transform:translateX(${S.backend.rememberToken?'15px':'0'});transition:transform 0.15s;`,
+      syncNow: () => this.syncNow(), saveRevision: () => this.saveRevision(), createNewProject: () => this.createNewProject(),
+      exportReport: () => this.exportReport(),
+      syncStatusLabel: { saved: 'Saved' + (S.lastSyncAt ? ' ' + S.lastSyncAt.toLocaleTimeString() : ''), saving: 'Saving…', offline: 'Offline — working locally', error: 'Sync Failed — tap to retry', conflict: 'Conflict — reload needed' }[S.syncStatus],
+      syncDotStyle: `width:7px;height:7px;border-radius:50%;background:${ {saved:'oklch(0.65 0.14 155)', saving:'oklch(0.75 0.14 70)', offline:'oklch(0.65 0.01 255)', error:'oklch(0.6 0.18 25)', conflict:'oklch(0.6 0.18 25)'}[S.syncStatus] };${S.syncStatus==='saving'?'animation:pulse 1s infinite;':''}`,
+      isConflict: S.syncStatus === 'conflict', conflictInfo: S.conflictInfo, reloadLatest: () => this.reloadLatest(),
+      showTrash: S.showTrash, toggleTrash: () => { this.setState(s=>({showTrash: !s.showTrash})); if (!S.showTrash) this.fetchTrash(); },
+      trashedProjects: S.trashedProjects.map(t => ({...t, restore: () => this.restoreProjectFromTrash(t.id)})),
+      migrateLocalData: () => this.migrateLocalData(), runHealthCheck: () => this.runHealthCheck(),
+      dbHealth: S.dbHealth, dbHealthRows: S.dbHealth ? Object.keys(S.dbHealth.counts).map(k => ({name:k, count:S.dbHealth.counts[k]})) : [],
+    };
+  }
+}
+
+</script>
+</body>
+</html>

@@ -23,6 +23,8 @@ Architecture: `Estimator.dc.html` (frontend) → Apps Script Web App (`backend/C
 4. Every subsequent code change to Code.gs needs **Deploy → Manage deployments → Edit → New version** to take effect on the existing URL.
 
 ## 4. Connect the frontend
+Use `QuantaBuild-Estimator.html`: a single file you can open directly or host anywhere. `Estimator.dc.html` needs `support.js` in the same folder and shows raw `{{ … }}` placeholders without it. After changing either source file, run `python3 build-standalone.py` to regenerate the single file.
+
 Settings → Google Sheets Backup: paste the Web App URL and API token, click **Connect**. Connect calls `list_projects`, which verifies the token (a wrong token shows "Connection failed: Unauthorized"), then loads the authoritative project list, replacing the local demo rows.
 
 The token input is masked. By default the token is kept in `sessionStorage` (this tab only) and you re-enter it in a new tab; turn on **Remember token on this device** to keep it in `localStorage` on a trusted computer. A token saved in plaintext by an older version is moved out of `localStorage` automatically.
