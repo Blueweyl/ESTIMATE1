@@ -67,11 +67,17 @@ function ensureSheets_() {
 
 // Run this once from the Apps Script editor (choose "setup" in the function menu, click Run).
 // Functions ending in "_" are private and don't appear in that menu.
-// Creates any missing tabs/columns; safe to re-run, never deletes data.
+// Creates any missing tabs/columns and, if none exists yet, a random API token.
+// Safe to re-run: never deletes data and never replaces an existing token.
 function setup() {
   ensureSheets_();
-  const missing = getProp_(API_TOKEN_PROP) ? '' : ' Next: add the API_TOKEN script property.';
-  Logger.log('QuantaBuild sheets are ready.' + missing);
+  let token = getProp_(API_TOKEN_PROP);
+  if (!token) {
+    token = 'qb-' + Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '').slice(0, 16);
+    PropertiesService.getScriptProperties().setProperty(API_TOKEN_PROP, token);
+    Logger.log('Created a new API token.');
+  }
+  Logger.log('QuantaBuild sheets are ready. Your API token (paste it into the app\'s Settings → API Token): ' + token);
 }
 
 function sheetByName_(name) { ensureSheets_(); return ss_().getSheetByName(name); }
